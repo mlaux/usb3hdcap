@@ -855,7 +855,7 @@ static int usb3hdcap_probe(struct usb_interface *intf,
 	hdcap->usb_dev = usb_get_dev(interface_to_usbdev(intf));
 	hdcap->input = INPUT_COMPOSITE;
 	hdcap->std = 0;
-	hdcap->width = NTSC_WIDTH;
+	hdcap->width = SD_WIDTH;
 	hdcap->height = NTSC_HEIGHT / 2;
 	hdcap->bpl = DEFAULT_BPL;
 

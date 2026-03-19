@@ -12,10 +12,10 @@ struct snd_pcm_substream;
 struct vb2_ops;
 
 /* NTSC SD frame format */
-#define NTSC_WIDTH     720
+#define SD_WIDTH       720
 #define NTSC_HEIGHT    480
 /* YUYV = 4 bytes/2 pixels */
-#define DEFAULT_BPL    (NTSC_WIDTH * 2)
+#define DEFAULT_BPL    (SD_WIDTH * 2)
 /* PAL SD frame format */
 #define PAL_HEIGHT    576
 

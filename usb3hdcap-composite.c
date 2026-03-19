@@ -56,7 +56,7 @@ static void usb3hdcap_detect_size(struct usb3hdcap *hdcap)
 	int status;
 	int full_h = (hdcap->std & V4L2_STD_625_50) ? PAL_HEIGHT : NTSC_HEIGHT;
 	int half_h = full_h / 2;
-	hdcap->width = NTSC_WIDTH;
+	hdcap->width = SD_WIDTH;
 	hdcap->height = half_h;
 
 	status = u3hc_i2c_read(hdcap, ADDR_TW9900, TW9900_CSTATUS_II);
