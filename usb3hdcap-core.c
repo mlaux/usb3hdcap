@@ -22,6 +22,7 @@
  * S-Video only... HDMI is unusable, component is untested.
  * 
  * Based on USBPcap analysis and reverse engineering of CY3014.X64.SYS
+ *   (version 1.1.0.193 of Fri, 04 Jun 2021 09:37:45 UTC)
  * MST3367 HDMI path based on hdcapm
  * Driver structure based heavily on usbtv
  */
@@ -912,7 +913,7 @@ static const struct usb_device_id usb3hdcap_id_table[] = {
 };
 MODULE_DEVICE_TABLE(usb, usb3hdcap_id_table);
 
-MODULE_AUTHOR("Matthew Laux");
+MODULE_AUTHOR("Matthew Laux <matthew.laux@gmail.com>");
 MODULE_DESCRIPTION("StarTech USB3HDCAP Driver");
 MODULE_LICENSE("GPL");
 
