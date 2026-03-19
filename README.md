@@ -49,6 +49,7 @@ make
 ### Limitations
 
 * DVI and VGA inputs not supported
+* V4L2 controls should be disabled on non-tw9900 inputs
 * Other video modes will probably "just work" if the appropriate entries are
   added in the mode tables and code is added to disambiguate using htotal if
   necessary
@@ -61,6 +62,7 @@ make
 
 * [stoth68000](https://github.com/stoth68000) for [hdcapm](https://github.com/stoth68000/hdcapm)
 * Driver structure heavily based on the `usbtv` driver
+* [rm-iso](https://github.com/rm-iso) for encouraging me to write this
 
 ## License
 
