@@ -73,6 +73,11 @@ struct usb3hdcap {
 	struct video_device video_dev;
 	struct vb2_queue vb2q;
 	struct v4l2_ctrl_handler ctrl;
+	struct v4l2_ctrl *ctrl_brightness;
+	struct v4l2_ctrl *ctrl_contrast;
+	struct v4l2_ctrl *ctrl_saturation;
+	struct v4l2_ctrl *ctrl_hue;
+	struct v4l2_ctrl *ctrl_sharpness;
 	struct mutex v4l2_lock;
 	struct mutex vb2q_lock;
 

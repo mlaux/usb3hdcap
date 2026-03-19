@@ -516,6 +516,15 @@ static int usb3hdcap_query_dv_timings(
 	return 0;
 }
 
+static void usb3hdcap_activate_tw9900_ctrls(struct usb3hdcap *hdcap, bool active)
+{
+	v4l2_ctrl_activate(hdcap->ctrl_brightness, active);
+	v4l2_ctrl_activate(hdcap->ctrl_contrast, active);
+	v4l2_ctrl_activate(hdcap->ctrl_saturation, active);
+	v4l2_ctrl_activate(hdcap->ctrl_hue, active);
+	v4l2_ctrl_activate(hdcap->ctrl_sharpness, active);
+}
+
 static int usb3hdcap_g_input(struct file *file, void *priv, unsigned int *i)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
@@ -545,6 +554,9 @@ static int usb3hdcap_s_input(struct file *file, void *priv, unsigned int i)
 
 	hdcap->bpl = hdcap->width * 2;
 	hdcap->hw_inited = 1;
+
+	usb3hdcap_activate_tw9900_ctrls(hdcap,
+		i == INPUT_COMPOSITE || i == INPUT_SVIDEO);
 
 	return 0;
 }
@@ -773,16 +785,16 @@ static int video_init(struct usb3hdcap *hdcap)
 	}
 
 	v4l2_ctrl_handler_init(&hdcap->ctrl, 5);
-	v4l2_ctrl_new_std(&hdcap->ctrl, &usb3hdcap_ctrl_ops,
-		V4L2_CID_BRIGHTNESS, -128, 127, 1, -9);
-	v4l2_ctrl_new_std(&hdcap->ctrl, &usb3hdcap_ctrl_ops,
-		V4L2_CID_CONTRAST, 0, 255, 1, 0x79);
-	v4l2_ctrl_new_std(&hdcap->ctrl, &usb3hdcap_ctrl_ops,
-		V4L2_CID_SATURATION, 0, 255, 1, 0x80);
-	v4l2_ctrl_new_std(&hdcap->ctrl, &usb3hdcap_ctrl_ops,
-		V4L2_CID_HUE, -128, 127, 1, 0);
-	v4l2_ctrl_new_std(&hdcap->ctrl, &usb3hdcap_ctrl_ops,
-		V4L2_CID_SHARPNESS, 0, 255, 1, 0x52);
+	hdcap->ctrl_brightness = v4l2_ctrl_new_std(&hdcap->ctrl,
+		&usb3hdcap_ctrl_ops, V4L2_CID_BRIGHTNESS, -128, 127, 1, -9);
+	hdcap->ctrl_contrast = v4l2_ctrl_new_std(&hdcap->ctrl,
+		&usb3hdcap_ctrl_ops, V4L2_CID_CONTRAST, 0, 255, 1, 0x79);
+	hdcap->ctrl_saturation = v4l2_ctrl_new_std(&hdcap->ctrl,
+		&usb3hdcap_ctrl_ops, V4L2_CID_SATURATION, 0, 255, 1, 0x80);
+	hdcap->ctrl_hue = v4l2_ctrl_new_std(&hdcap->ctrl,
+		&usb3hdcap_ctrl_ops, V4L2_CID_HUE, -128, 127, 1, 0);
+	hdcap->ctrl_sharpness = v4l2_ctrl_new_std(&hdcap->ctrl,
+		&usb3hdcap_ctrl_ops, V4L2_CID_SHARPNESS, 0, 255, 1, 0x52);
 	ret = hdcap->ctrl.error;
 	if (ret < 0) {
 		dev_warn(hdcap->dev, "Could not initialize controls\n");
