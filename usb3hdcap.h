@@ -72,9 +72,9 @@ enum usb3hdcap_input {
 
 /* TW9900 bit definitions */
 #define TW9900_NINTL         0x08
-#define TW9900_STDNOW_SHIFT 4
-#define TW9900_STDNOW_MASK  0x70
-#define TW9900_STD_NTSC_M   0
+#define TW9900_STDNOW_SHIFT  4
+#define TW9900_STDNOW_MASK   0x70
+#define TW9900_STD_NTSC_M    0
 #define TW9900_STD_PAL_BDGHI 1
 #define TW9900_STD_SECAM     2
 #define TW9900_STD_NTSC_4_43 3
@@ -83,18 +83,18 @@ enum usb3hdcap_input {
 #define TW9900_STD_PAL_60    6
 
 /* CS53L21 registers */
-#define CS53L21_MIC_PWR_CTL 0x03
-#define CS53L21_IFACE_CTL  0x04
-#define CS53L21_ADC_IN_SEL 0x07
-#define CS53L21_SPE_CTL    0x09
-#define CS53L21_ALC_PGAA   0x0a
-#define CS53L21_ALC_PGAB   0x0b
-#define CS53L21_ADCA_ATT   0x0c
-#define CS53L21_ADCB_ATT   0x0d
+#define CS53L21_MIC_PWR_CTL  0x03
+#define CS53L21_IFACE_CTL    0x04
+#define CS53L21_ADC_IN_SEL   0x07
+#define CS53L21_SPE_CTL      0x09
+#define CS53L21_ALC_PGAA     0x0a
+#define CS53L21_ALC_PGAB     0x0b
+#define CS53L21_ADCA_ATT     0x0c
+#define CS53L21_ADCB_ATT     0x0d
 #define CS53L21_ADCA_MIX_VOL 0x0e
 #define CS53L21_ADCB_MIX_VOL 0x0f
-#define CS53L21_CH_MIXER   0x18
-#define CS53L21_ALC_EN_ATK 0x1c
+#define CS53L21_CH_MIXER     0x18
+#define CS53L21_ALC_EN_ATK   0x1c
 
 /* Vendor request codes */
 #define REQ_I2C    0xc0
@@ -104,9 +104,9 @@ enum usb3hdcap_input {
 #define REQ_UNK_C7 0xc7
 
 /* Isochronous transfer parameters */
-#define EP_VIDEO       0x83
-#define NUM_XFERS      8
-#define NUM_ISO_PKTS   64
+#define EP_VIDEO     0x83
+#define NUM_XFERS    8
+#define NUM_ISO_PKTS 64
 
 /* 
  * Stream framing: two element types in the byte stream, both
@@ -121,8 +121,8 @@ enum usb3hdcap_input {
 #define PARSE_BUF_SIZE (2 * 1024 * 1024)
 
 /* BT.656 SAV XY bits */
-#define BT656_F_BIT    0x40
-#define BT656_V_BIT    0x20
+#define BT656_F_BIT 0x40
+#define BT656_V_BIT 0x20
 
 struct hdcap_buf {
 	struct vb2_v4l2_buffer vb;
@@ -135,12 +135,14 @@ struct usb3hdcap {
 	struct v4l2_device v4l2_dev;
 	struct video_device video_dev;
 	struct vb2_queue vb2q;
+
 	struct v4l2_ctrl_handler ctrl;
 	struct v4l2_ctrl *ctrl_brightness;
 	struct v4l2_ctrl *ctrl_contrast;
 	struct v4l2_ctrl *ctrl_saturation;
 	struct v4l2_ctrl *ctrl_hue;
 	struct v4l2_ctrl *ctrl_sharpness;
+
 	struct mutex v4l2_lock;
 	struct mutex vb2q_lock;
 
