@@ -679,16 +679,16 @@ static int usb3hdcap_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	switch (ctrl->id) {
 	case V4L2_CID_BRIGHTNESS:
-		return u3hc_i2c_write(hdcap, ADDR_TW9900, 0x10, (u8)ctrl->val);
+		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_BRIGHT, (u8)ctrl->val);
 	case V4L2_CID_CONTRAST:
-		return u3hc_i2c_write(hdcap, ADDR_TW9900, 0x11, ctrl->val);
+		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_CONTRAST, ctrl->val);
 	case V4L2_CID_SATURATION:
-		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x13, ctrl->val);
-		return u3hc_i2c_write(hdcap, ADDR_TW9900, 0x14, ctrl->val);
+		u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_SAT_U, ctrl->val);
+		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_SAT_V, ctrl->val);
 	case V4L2_CID_HUE:
-		return u3hc_i2c_write(hdcap, ADDR_TW9900, 0x15, (u8)ctrl->val);
+		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_HUE, (u8)ctrl->val);
 	case V4L2_CID_SHARPNESS:
-		return u3hc_i2c_write(hdcap, ADDR_TW9900, 0x12, ctrl->val);
+		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_SHARPNESS, ctrl->val);
 	default:
 		return -EINVAL;
 	}

@@ -33,6 +33,69 @@ enum usb3hdcap_input {
 #define ADDR_CPLD    0x98
 #define ADDR_MCU     0x64 /* Nuvoton NUC100 on XCAPTURE-1 */
 
+/* TW9900 registers */
+#define TW9900_CSTATUS    0x01
+#define TW9900_INFORM     0x02
+#define TW9900_OPFORM     0x03
+#define TW9900_OPCNTL_I   0x05
+#define TW9900_ACNTL_I    0x06
+#define TW9900_CROP_HI    0x07
+#define TW9900_VDELAY_LO  0x08
+#define TW9900_VACTIVE_LO 0x09
+#define TW9900_HDELAY_LO  0x0a
+#define TW9900_HACTIVE_LO 0x0b
+#define TW9900_CNTRL2     0x0d
+#define TW9900_SDT_NOISE  0x0e
+#define TW9900_LUMA_CTL   0x0f
+#define TW9900_BRIGHT     0x10
+#define TW9900_CONTRAST   0x11
+#define TW9900_SHARPNESS  0x12
+#define TW9900_SAT_U      0x13
+#define TW9900_SAT_V      0x14
+#define TW9900_HUE        0x15
+#define TW9900_VBICNTL    0x19
+#define TW9900_ACNTL_II   0x1a
+#define TW9900_OPCNTL_II  0x1b
+#define TW9900_SDT        0x1c
+#define TW9900_SDTR       0x1d
+#define TW9900_VCNTL1     0x28
+#define TW9900_VCNTL2     0x29
+#define TW9900_MISC1      0x2d
+#define TW9900_MISC2      0x2f
+#define TW9900_CSTATUS_II 0x31
+#define TW9900_ANAPLLCTL  0x4c
+#define TW9900_VVBI       0x55
+#define TW9900_HSBEGIN    0x6b
+#define TW9900_HSEND      0x6c
+#define TW9900_OVSDLY     0x6d
+#define TW9900_OVSEND     0x6e
+
+/* TW9900 bit definitions */
+#define TW9900_NINTL         0x08
+#define TW9900_STDNOW_SHIFT 4
+#define TW9900_STDNOW_MASK  0x70
+#define TW9900_STD_NTSC_M   0
+#define TW9900_STD_PAL_BDGHI 1
+#define TW9900_STD_SECAM     2
+#define TW9900_STD_NTSC_4_43 3
+#define TW9900_STD_PAL_M     4
+#define TW9900_STD_PAL_CN    5
+#define TW9900_STD_PAL_60    6
+
+/* CS53L21 registers */
+#define CS53L21_MIC_PWR_CTL 0x03
+#define CS53L21_IFACE_CTL  0x04
+#define CS53L21_ADC_IN_SEL 0x07
+#define CS53L21_SPE_CTL    0x09
+#define CS53L21_ALC_PGAA   0x0a
+#define CS53L21_ALC_PGAB   0x0b
+#define CS53L21_ADCA_ATT   0x0c
+#define CS53L21_ADCB_ATT   0x0d
+#define CS53L21_ADCA_MIX_VOL 0x0e
+#define CS53L21_ADCB_MIX_VOL 0x0f
+#define CS53L21_CH_MIXER   0x18
+#define CS53L21_ALC_EN_ATK 0x1c
+
 /* Vendor request codes */
 #define REQ_I2C    0xc0
 #define REQ_GPIO   0xc1

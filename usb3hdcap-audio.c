@@ -13,20 +13,6 @@
 
 #include "usb3hdcap.h"
 
-/* CS53L21 register addresses */
-#define CS53L21_PWR_CTL		0x03
-#define CS53L21_IFACE_CTL	0x04
-#define CS53L21_MIC_CTL		0x07
-#define CS53L21_PGAA_CTL	0x0a
-#define CS53L21_PGAB_CTL	0x0b
-#define CS53L21_ADCA_ATT	0x0c
-#define CS53L21_ADCB_ATT	0x0d
-#define CS53L21_ADC_CTL		0x09
-#define CS53L21_ALC_PGAA	0x0e
-#define CS53L21_ALC_PGAB	0x0f
-#define CS53L21_NOISE_CTL	0x18
-#define CS53L21_LIMIT_CTL	0x1c
-
 /* ALSA buffer sizing */
 #define HDCAP_AUDIO_BUFSZ	(64 * 1024)
 
@@ -195,26 +181,27 @@ int usb3hdcap_cs53l21_init(struct usb3hdcap *hdcap)
 {
 	int ret;
 
-	/* power control: PDN_ADC{A,B}=1, PDN=0 */
-	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_PWR_CTL, 0x4e);
+	/* MIC power control: power down mic B, mic A, and bias */
+	/* SPEED = "10 - Half-Speed Mode (HSM) - 12.5 to 25 kHz sample rates" */
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_MIC_PWR_CTL, 0x4e);
 	if (ret)
 		return ret;
 
-	/* interface: I2S, slave, 16-bit */
+	/* interface: I2S, master */
 	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_IFACE_CTL, 0x44);
 	if (ret)
 		return ret;
 
-	/* mic: no boost, no preamp */
-	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_MIC_CTL, 0x00);
+	/* ADC input select: default */
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ADC_IN_SEL, 0x00);
 	if (ret)
 		return ret;
 
-	/* PGA: 0 dB */
-	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_PGAA_CTL, 0x00);
+	/* ALC/PGA: 0 dB */
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ALC_PGAA, 0x00);
 	if (ret)
 		return ret;
-	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_PGAB_CTL, 0x00);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ALC_PGAB, 0x00);
 	if (ret)
 		return ret;
 
@@ -226,31 +213,31 @@ int usb3hdcap_cs53l21_init(struct usb3hdcap *hdcap)
 	if (ret)
 		return ret;
 
-	/* limiter: threshold */
-	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_LIMIT_CTL, 0xc0);
+	/* ALC enable and attack rate = fastest attack */
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ALC_EN_ATK, 0xc0);
 	if (ret)
 		return ret;
 
-	/* interface: enable MCLKDIV2 */
+	/* interface: "SPE Processed ADC data to ADC serial port, SDOUT data." */
 	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_IFACE_CTL, 0x46);
 	if (ret)
 		return ret;
 
-	/* ADC control: HPF enable, both channels */
-	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ADC_CTL, 0x42);
+	/* SPE control: SPE enable, "Soft Ramp" turned on */
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_SPE_CTL, 0x42);
 	if (ret)
 		return ret;
 
-	/* ALC/PGA: +5 dB */
-	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ALC_PGAA, 0x05);
+	/* ADC mixer volume: +2.5 dB */
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ADCA_MIX_VOL, 0x05);
 	if (ret)
 		return ret;
-	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ALC_PGAB, 0x05);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ADCB_MIX_VOL, 0x05);
 	if (ret)
 		return ret;
 
-	/* noise gate: off */
-	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_NOISE_CTL, 0x00);
+	/* channel mixer: off */
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_CH_MIXER, 0x00);
 	if (ret)
 		return ret;
 
