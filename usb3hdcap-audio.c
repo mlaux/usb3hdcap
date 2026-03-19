@@ -196,61 +196,61 @@ int usb3hdcap_cs53l21_init(struct usb3hdcap *hdcap)
 	int ret;
 
 	/* power control: PDN_ADC{A,B}=1, PDN=0 */
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_PWR_CTL, 0x4e);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_PWR_CTL, 0x4e);
 	if (ret)
 		return ret;
 
 	/* interface: I2S, slave, 16-bit */
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_IFACE_CTL, 0x44);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_IFACE_CTL, 0x44);
 	if (ret)
 		return ret;
 
 	/* mic: no boost, no preamp */
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_MIC_CTL, 0x00);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_MIC_CTL, 0x00);
 	if (ret)
 		return ret;
 
 	/* PGA: 0 dB */
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_PGAA_CTL, 0x00);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_PGAA_CTL, 0x00);
 	if (ret)
 		return ret;
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_PGAB_CTL, 0x00);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_PGAB_CTL, 0x00);
 	if (ret)
 		return ret;
 
 	/* ADC attenuators: 0 dB */
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_ADCA_ATT, 0x00);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ADCA_ATT, 0x00);
 	if (ret)
 		return ret;
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_ADCB_ATT, 0x00);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ADCB_ATT, 0x00);
 	if (ret)
 		return ret;
 
 	/* limiter: threshold */
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_LIMIT_CTL, 0xc0);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_LIMIT_CTL, 0xc0);
 	if (ret)
 		return ret;
 
 	/* interface: enable MCLKDIV2 */
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_IFACE_CTL, 0x46);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_IFACE_CTL, 0x46);
 	if (ret)
 		return ret;
 
 	/* ADC control: HPF enable, both channels */
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_ADC_CTL, 0x42);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ADC_CTL, 0x42);
 	if (ret)
 		return ret;
 
 	/* ALC/PGA: +5 dB */
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_ALC_PGAA, 0x05);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ALC_PGAA, 0x05);
 	if (ret)
 		return ret;
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_ALC_PGAB, 0x05);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ALC_PGAB, 0x05);
 	if (ret)
 		return ret;
 
 	/* noise gate: off */
-	ret = i2c_write(hdcap, ADDR_CS53L21, CS53L21_NOISE_CTL, 0x00);
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_NOISE_CTL, 0x00);
 	if (ret)
 		return ret;
 

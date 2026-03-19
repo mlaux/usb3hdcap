@@ -134,10 +134,10 @@ struct usb3hdcap {
 /* USB control helpers (usb3hdcap-core.c) */
 int vendor_out(struct usb3hdcap *hdcap, u8 request, u16 value, u16 index,
 	       u8 *data, u16 len);
-int i2c_write(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 val);
-int i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg);
-int i2c_rmw(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits);
-int i2c_rmw_get_old(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits, u8 *old);
+int u3hc_i2c_write(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 val);
+int u3hc_i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg);
+int u3hc_i2c_rmw(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits);
+int u3hc_i2c_rmw_get_old(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits, u8 *old);
 int usb3hdcap_hw_init(struct usb3hdcap *hdcap);
 
 /* Composite (usb3hdcap-composite.c) */

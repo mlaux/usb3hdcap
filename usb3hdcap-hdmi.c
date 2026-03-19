@@ -98,7 +98,7 @@ static int mst_bank(struct usb3hdcap *hdcap, int bank)
 	if (hdcap->mst_current_bank == bank)
 		return 0;
 	hdcap->mst_current_bank = bank;
-	return i2c_write(hdcap, ADDR_MST3367, 0x00, bank);
+	return u3hc_i2c_write(hdcap, ADDR_MST3367, 0x00, bank);
 }
 
 /* ------------------------------------------------------------------ */
@@ -114,89 +114,89 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 
 	/* Bank 0 initial config */
 	mst_bank(hdcap, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x51, 0x80);
-	//i2c_write(hdcap, ADDR_MST3367, 0x13, 0x08);
-	i2c_write(hdcap, ADDR_MST3367, 0xb7, 0x02);
-	i2c_write(hdcap, ADDR_MST3367, 0x41, 0x6f);
-	i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0xb0, 0x14);
-	i2c_write(hdcap, ADDR_MST3367, 0xae, 0x04);
-	i2c_write(hdcap, ADDR_MST3367, 0xad, 0x05);
-	i2c_write(hdcap, ADDR_MST3367, 0xb1, 0xc0);
-	i2c_write(hdcap, ADDR_MST3367, 0xb2, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0xb3, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0xb4, 0x55);
-	i2c_write(hdcap, ADDR_MST3367, 0xb4, 0x54);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x51, 0x80);
+	//u3hc_i2c_write(hdcap, ADDR_MST3367, 0x13, 0x08);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb7, 0x02);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x41, 0x6f);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb0, 0x14);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xae, 0x04);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xad, 0x05);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb1, 0xc0);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb2, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb3, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb4, 0x55);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb4, 0x54);
 
 	/* Bank 1: TMDS/HDCP */
 	mst_bank(hdcap, 0x01);
-	i2c_write(hdcap, ADDR_MST3367, 0x0f, 0x02);
-	i2c_write(hdcap, ADDR_MST3367, 0x16, 0x30);
-	i2c_write(hdcap, ADDR_MST3367, 0x17, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x18, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x19, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x1a, 0x50);
-	i2c_write(hdcap, ADDR_MST3367, 0x2a, 0x07);
-	i2c_write(hdcap, ADDR_MST3367, 0x24, 0x40);
-	i2c_write(hdcap, ADDR_MST3367, 0x30, 0x80);
-	i2c_write(hdcap, ADDR_MST3367, 0x31, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x32, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0f, 0x02);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x16, 0x30);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x17, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x18, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x19, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1a, 0x50);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2a, 0x07);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x24, 0x40);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x30, 0x80);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x31, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x32, 0x00);
 
 	/* Bank 2: video/audio config */
 	mst_bank(hdcap, 0x02);
-	i2c_write(hdcap, ADDR_MST3367, 0x08, 0x03);
-	i2c_write(hdcap, ADDR_MST3367, 0x01, 0x61);
-	i2c_write(hdcap, ADDR_MST3367, 0x02, 0xf5);
-	i2c_write(hdcap, ADDR_MST3367, 0x03, 0x02);
-	i2c_write(hdcap, ADDR_MST3367, 0x04, 0x01);
-	i2c_write(hdcap, ADDR_MST3367, 0x05, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x06, 0x08);
-	i2c_write(hdcap, ADDR_MST3367, 0x1c, 0x1a);
-	i2c_write(hdcap, ADDR_MST3367, 0x1d, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x1e, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x1f, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x25, 0xa2);
-	i2c_write(hdcap, ADDR_MST3367, 0x07, 0x04);
-	i2c_write(hdcap, ADDR_MST3367, 0x17, 0xc0);
-	i2c_write(hdcap, ADDR_MST3367, 0x19, 0xff);
-	i2c_write(hdcap, ADDR_MST3367, 0x1a, 0xff);
-	i2c_write(hdcap, ADDR_MST3367, 0x1b, 0xfc);
-	i2c_write(hdcap, ADDR_MST3367, 0x20, 0x00);
-	i2c_rmw(hdcap, ADDR_MST3367, 0x21, 0xfc, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x22, 0x26);
-	i2c_write(hdcap, ADDR_MST3367, 0x27, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x2e, 0xa1);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x08, 0x03);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x01, 0x61);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x02, 0xf5);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x03, 0x02);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x04, 0x01);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x05, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x06, 0x08);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1c, 0x1a);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1d, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1e, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1f, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x25, 0xa2);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, 0x04);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x17, 0xc0);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x19, 0xff);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1a, 0xff);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1b, 0xfc);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x20, 0x00);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x21, 0xfc, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x22, 0x26);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x27, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2e, 0xa1);
 
 	/* HDCP reset + PLL */
 	mst_bank(hdcap, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0xab, 0x15);
-	i2c_write(hdcap, ADDR_MST3367, 0xac, 0x15);
-	i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x10);
-	i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xab, 0x15);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xac, 0x15);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x10);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x00);
 
 	mst_bank(hdcap, 0x02);
-	i2c_write(hdcap, ADDR_MST3367, 0x07, 0xf4); /* PLL reset */
-	i2c_write(hdcap, ADDR_MST3367, 0x07, 0x04); /* PLL run */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, 0xf4); /* PLL reset */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, 0x04); /* PLL run */
 
 	/* HDMI port select (overridden for component later) */
 	mst_bank(hdcap, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x51, 0x81);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x51, 0x81);
 
-	i2c_write(hdcap, ADDR_MST3367, 0xb7, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb7, 0x00);
 
 	/* FUN_140249ec8, absolutely no idea what this does */
 	mst_bank(hdcap, 0x02);
-	i2c_rmw(hdcap, ADDR_MST3367, 0x01, 0x0f, 0x60);
-	i2c_rmw(hdcap, ADDR_MST3367, 0x04, 0xff, 0x01);
-	i2c_write(hdcap, ADDR_MST3367, 0x06, 0x08);
-	i2c_rmw(hdcap, ADDR_MST3367, 0x09, 0xff, 0x20);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x01, 0x0f, 0x60);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x04, 0xff, 0x01);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x06, 0x08);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x09, 0xff, 0x20);
 
 	mst_bank(hdcap, 0x00);
-	i2c_rmw(hdcap, ADDR_MST3367, 0x54, 0xef, 0x00); /* clear bit 4 */
-	i2c_rmw(hdcap, ADDR_MST3367, 0xac, 0xff, 0x80); /* set bit 7 */
-	i2c_rmw(hdcap, ADDR_MST3367, 0x00, 0xff, 0x80);
-	i2c_rmw(hdcap, ADDR_MST3367, 0xce, 0xff, 0x80); /* set bit 7 */
-	i2c_rmw(hdcap, ADDR_MST3367, 0xcf, 0xfa, 0x02); /* clear bits 0,2; set bit 1 */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x54, 0xef, 0x00); /* clear bit 4 */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xac, 0xff, 0x80); /* set bit 7 */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x00, 0xff, 0x80);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xce, 0xff, 0x80); /* set bit 7 */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xcf, 0xfa, 0x02); /* clear bits 0,2; set bit 1 */
 
 	/*
 		8c28 is "CustomCompanyEndoCamProperty" (0 in my registry)
@@ -214,10 +214,10 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 	    }
 		... which has this effect:
 	*/
-	i2c_rmw(hdcap, ADDR_MST3367, 0xd0, 0xfc, 0x00);
-	i2c_rmw(hdcap, ADDR_MST3367, 0xcf, 0x7f, 0x00);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xd0, 0xfc, 0x00);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xcf, 0x7f, 0x00);
 
-	i2c_rmw(hdcap, ADDR_MST3367, 0x00, 0x7f, 0x00);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x00, 0x7f, 0x00);
 	mst_bank(hdcap, 0x00);
 }
 
@@ -245,7 +245,7 @@ static void cpld_init(struct usb3hdcap *hdcap, u8 mux_val)
 		}
 	*/
 
-	i2c_write(hdcap, ADDR_CPLD, 0x3b, mux_val);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x3b, mux_val);
 
 	/*
 		local_res8[0] = '\x05';
@@ -256,20 +256,20 @@ static void cpld_init(struct usb3hdcap *hdcap, u8 mux_val)
 		local_res8[0] = (-(cVar3 != '\0') & 0xfeU) - 2;
 		i2c_write(param_1,0x98,0x10,local_res8,1);
 	*/
-	i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
-	i2c_write(hdcap, ADDR_CPLD, 0x00, 0x01);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x00, 0x01);
 
-	i2c_write(hdcap, ADDR_CPLD, 0x10, hdcap->has_mcu ? 0xfc : 0xfe);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x10, hdcap->has_mcu ? 0xfc : 0xfe);
 
 	for (k = 0; k < 50; k++) {
-		status = i2c_read(hdcap, ADDR_CPLD, 0x01);
+		status = u3hc_i2c_read(hdcap, ADDR_CPLD, 0x01);
 		if (status >= 0x03)
 			break;
 		msleep(20);
 	}
 
-	i2c_write(hdcap, ADDR_CPLD, 0x01, 0x02);
-	i2c_write(hdcap, ADDR_CPLD, 0x11, 0xfc);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x01, 0x02);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x11, 0xfc);
 }
 
 /* ------------------------------------------------------------------ */
@@ -288,10 +288,10 @@ static void mst3367_identity_csc(struct usb3hdcap *hdcap)
 		bVar3 = read_mst(param_1,0,0xab);
 		send_mst(param_1,0,0xab,bVar3 & 0x7f | 0x80);
   	*/
-	i2c_rmw_get_old(hdcap, ADDR_MST3367, 0xab, 0x7f, 0x80, &old_ab);
+	u3hc_i2c_rmw_get_old(hdcap, ADDR_MST3367, 0xab, 0x7f, 0x80, &old_ab);
 
-	i2c_write(hdcap, ADDR_MST3367, 0x90, 0x15);
-	i2c_write(hdcap, ADDR_MST3367, 0x91, 0x15);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x90, 0x15);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x91, 0x15);
 	/*
 	  	iVar1 = *(int *)(lVar2 + 0x60);
 		if (*(int *)(lVar2 + 0x5c) == 1) {
@@ -302,37 +302,37 @@ static void mst3367_identity_csc(struct usb3hdcap *hdcap)
 		}
 		send_mst(param_1,0,0x92,cVar5);
 	*/
-	i2c_write(hdcap, ADDR_MST3367, 0x92, comp ? 0x66 : 0x62);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x92, comp ? 0x66 : 0x62);
 
 	/* start from FUN_140249474 */
-	i2c_write(hdcap, ADDR_MST3367, 0xac, comp ? 0x15 : 0x95);
-	i2c_write(hdcap, ADDR_MST3367, 0xad, 0x05);
-	i2c_write(hdcap, ADDR_MST3367, 0x1e, 0x11);
-	i2c_write(hdcap, ADDR_MST3367, 0x1f, 0x01);
-	i2c_write(hdcap, ADDR_MST3367, 0x9c, comp ? 0x00 : 0x3f);
-	i2c_write(hdcap, ADDR_MST3367, 0x9b, 0x10);
-	i2c_write(hdcap, ADDR_MST3367, 0x96, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x95, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0xa2, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0xa1, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x9a, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x99, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x94, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x93, 0x10);
-	i2c_write(hdcap, ADDR_MST3367, 0xa0, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x9f, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x9e, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x9d, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x98, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x97, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0xa4, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0xa3, 0x10);
-	i2c_write(hdcap, ADDR_MST3367, 0xa6, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0xa5, 0x20);
-	i2c_write(hdcap, ADDR_MST3367, 0xa8, comp ? 0x80 : 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0xa7, comp ? 0x03 : 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0xaa, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0xa9, 0x20);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xac, comp ? 0x15 : 0x95);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xad, 0x05);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1e, 0x11);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1f, 0x01);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x9c, comp ? 0x00 : 0x3f);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x9b, 0x10);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x96, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x95, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xa2, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xa1, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x9a, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x99, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x94, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x93, 0x10);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xa0, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x9f, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x9e, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x9d, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x98, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x97, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xa4, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xa3, 0x10);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xa6, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xa5, 0x20);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xa8, comp ? 0x80 : 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xa7, comp ? 0x03 : 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xaa, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xa9, 0x20);
 	/* end from FUN_140249474 */
 
 	/*
@@ -347,15 +347,15 @@ static void mst3367_identity_csc(struct usb3hdcap *hdcap)
 		0x24 = RX_OUTPUT_YUV422 / 10.BITS / EXTERNAL SYNC,
 		0x20 = RX_OUTPUT_YUV422 / 08.BITS / EXTERNAL SYNC
 	*/
-	i2c_rmw(hdcap, ADDR_MST3367, 0xb0, 0xc2, 0x21);
-	i2c_write(hdcap, ADDR_MST3367, 0xab, old_ab & 0x7f);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xb0, 0xc2, 0x21);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xab, old_ab & 0x7f);
 
 	/* some kind of output enable */
-	i2c_write(hdcap, ADDR_MST3367, 0xb3, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb3, 0x00);
 
 	mst_bank(hdcap, 0x02);
-	i2c_write(hdcap, ADDR_MST3367, 0x27, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x20, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x27, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x20, 0x00);
 }
 
 /* ------------------------------------------------------------------ */
@@ -391,7 +391,7 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 
 	for (k = 0; k < 100; k++) {
 		mst_bank(hdcap, 0x00);
-		status = i2c_read(hdcap, ADDR_MST3367, 0x55);
+		status = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x55);
 		if (status < 0) {
 			msleep(100);
 			continue;
@@ -407,14 +407,14 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 			int htotal, vtotal, hactive;
 			int pll;
 
-			htotal = (i2c_read(hdcap, ADDR_MST3367, 0x6a) << 8 |
-				  i2c_read(hdcap, ADDR_MST3367, 0x6b)) & 0xfff;
-			vtotal = (i2c_read(hdcap, ADDR_MST3367, 0x5b) << 8 |
-				  i2c_read(hdcap, ADDR_MST3367, 0x5c)) & 0x7ff;
+			htotal = (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x6a) << 8 |
+				  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x6b)) & 0xfff;
+			vtotal = (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5b) << 8 |
+				  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5c)) & 0x7ff;
 
 			mst_bank(hdcap, 0x02);
-			hactive = (i2c_read(hdcap, ADDR_MST3367, 0x29) << 8 |
-				   i2c_read(hdcap, ADDR_MST3367, 0x28)) & 0x1fff;
+			hactive = (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x29) << 8 |
+				   u3hc_i2c_read(hdcap, ADDR_MST3367, 0x28)) & 0x1fff;
 
 			dev_info(hdcap->dev,
 				"HDMI locked: htotal=%d vtotal=%d hactive=%d\n",
@@ -435,19 +435,19 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 
 			/* "DISABLE AUTO POSITION" idk why windows does this here */
 			mst_bank(hdcap, 0x00);
-			i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x00);
+			u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x00);
 
 			/* PLL re-toggle */
 			mst_bank(hdcap, 0x02);
-			pll = i2c_read(hdcap, ADDR_MST3367, 0x07);
-			i2c_write(hdcap, ADDR_MST3367, 0x07, pll | 0x10);
-			i2c_write(hdcap, ADDR_MST3367, 0x07, pll & ~0x10);
+			pll = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x07);
+			u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, pll | 0x10);
+			u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, pll & ~0x10);
 
 			return 0;
 		}
 
 		/* Not locked yet */
-		i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x00);
+		u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x00);
 		msleep(100);
 	}
 
@@ -464,16 +464,16 @@ static void mst3367_adc_config(struct usb3hdcap *hdcap)
 	/* not sure what any of these do other than only being used in the 
 	   analog path */
 	mst_bank(hdcap, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x00, 0x80);
-	i2c_write(hdcap, ADDR_MST3367, 0x24, 0xc0);
-	i2c_write(hdcap, ADDR_MST3367, 0x00, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x21, 0x01);
-	i2c_write(hdcap, ADDR_MST3367, 0x04, 0x00);
-	i2c_rmw(hdcap, ADDR_MST3367, 0x10, 0xdf, 0x40);
-	i2c_write(hdcap, ADDR_MST3367, 0x11, 0x2d);
-	i2c_write(hdcap, ADDR_MST3367, 0x20, 0xc0);
-	i2c_write(hdcap, ADDR_MST3367, 0x21, 0x04);
-	i2c_rmw(hdcap, ADDR_MST3367, 0x0e, 0xff, 0x30);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x00, 0x80);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x24, 0xc0);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x00, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x21, 0x01);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x04, 0x00);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x10, 0xdf, 0x40);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x11, 0x2d);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x20, 0xc0);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x21, 0x04);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x0e, 0xff, 0x30);
 }
 
 static const struct component_mode *match_component_mode(int vtotal)
@@ -518,63 +518,63 @@ static void component_write_scaler(
         }
         send_mst(param_1,0,0x12,uVar37);
 	*/
-	i2c_write(hdcap, ADDR_MST3367, 0x12, is_720_low_rr ? 0x00 : 0x04);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x12, is_720_low_rr ? 0x00 : 0x04);
 
 
 	/* filter/gain */
-	i2c_write(hdcap, ADDR_MST3367, 0x03, m->reg_03);
-	i2c_write(hdcap, ADDR_MST3367, 0x05, m->reg_05);
-	i2c_write(hdcap, ADDR_MST3367, 0x06, m->reg_06);
-	i2c_write(hdcap, ADDR_MST3367, 0x07, m->reg_07);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x03, m->reg_03);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x05, m->reg_05);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x06, m->reg_06);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, m->reg_07);
 
 	/* cutoff */
-	i2c_write(hdcap, ADDR_MST3367, 0x08, 0xa0);
-	i2c_write(hdcap, ADDR_MST3367, 0x09, 0xc0);
-	i2c_write(hdcap, ADDR_MST3367, 0x0a, 0xa0);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x08, 0xa0);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x09, 0xc0);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0a, 0xa0);
 
 	/* gain */
-	i2c_write(hdcap, ADDR_MST3367, 0x0b, 0x80);
-	i2c_write(hdcap, ADDR_MST3367, 0x0c, 0x60);
-	i2c_write(hdcap, ADDR_MST3367, 0x0d, 0x80);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0b, 0x80);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0c, 0x60);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0d, 0x80);
 
 	/* no idea */
-	i2c_write(hdcap, ADDR_MST3367, 0x18, 0x10);
-	i2c_write(hdcap, ADDR_MST3367, 0x19, 0x10);
-	i2c_write(hdcap, ADDR_MST3367, 0x1a, 0x10);
-	i2c_write(hdcap, ADDR_MST3367, 0x1b, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x1c, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x1d, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x18, 0x10);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x19, 0x10);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1a, 0x10);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1b, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1c, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1d, 0x00);
 
 	/* output timing */
-	i2c_write(hdcap, ADDR_MST3367, 0x01, ht >> 4);
-	i2c_write(hdcap, ADDR_MST3367, 0x02, (ht & 0x0f) << 4);
-	i2c_write(hdcap, ADDR_MST3367, 0x1e, m->reg_1e);
-	i2c_write(hdcap, ADDR_MST3367, 0x1f, m->reg_1f);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x01, ht >> 4);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x02, (ht & 0x0f) << 4);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1e, m->reg_1e);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1f, m->reg_1f);
 
 	/* output data enable start pos after sync */
-	i2c_write(hdcap, ADDR_MST3367, 0x80, (m->hde_off >> 8) & 0x0f);
-	i2c_write(hdcap, ADDR_MST3367, 0x81, m->hde_off & 0xff);
-	i2c_write(hdcap, ADDR_MST3367, 0x82, (m->width >> 8) & 0xff);
-	i2c_write(hdcap, ADDR_MST3367, 0x83, m->width & 0xff);
-	i2c_write(hdcap, ADDR_MST3367, 0x84, m->vde_off);
-	i2c_write(hdcap, ADDR_MST3367, 0x85,
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x80, (m->hde_off >> 8) & 0x0f);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x81, m->hde_off & 0xff);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x82, (m->width >> 8) & 0xff);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x83, m->width & 0xff);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x84, m->vde_off);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x85,
 		  ((m->height >> 8) & 0x0f) | (m->interlaced ? 0x20 : 0x00));
-	i2c_write(hdcap, ADDR_MST3367, 0x86, m->height & 0xff);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x86, m->height & 0xff);
 
 	/* sync */
-	i2c_write(hdcap, ADDR_MST3367, 0x2d, 0x11);
-	i2c_write(hdcap, ADDR_MST3367, 0x2e, 0x11);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2d, 0x11);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2e, 0x11);
 	/* reg 0x39 = reg_05 + reg_06 - 0x78 (from decompiled code) */
-	i2c_write(hdcap, ADDR_MST3367, 0x39, (u8) (m->reg_05 + m->reg_06 - 0x78));
-	i2c_write(hdcap, ADDR_MST3367, 0x2c, 0x9d);
-	i2c_write(hdcap, ADDR_MST3367, 0x3a, 0x0c);
-	i2c_write(hdcap, ADDR_MST3367, 0x3b, 0x08);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x39, (u8) (m->reg_05 + m->reg_06 - 0x78));
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2c, 0x9d);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x3a, 0x0c);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x3b, 0x08);
 
-	i2c_rmw(hdcap, ADDR_MST3367, 0x10, 0xfa, 0x05); /* set bits 0,2 */
-	i2c_rmw(hdcap, ADDR_MST3367, 0x0f, 0xff, 0x20); /* set bit 5 */
-	i2c_rmw(hdcap, ADDR_MST3367, 0x17, 0xff, 0x02); /* set bit 1 */
-	i2c_rmw(hdcap, ADDR_MST3367, 0x2f, 0xff, 0x02); /* set bit 1 */
-	i2c_rmw(hdcap, ADDR_MST3367, 0x60, 0xfb, 0x00); /* clear bit 2 */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x10, 0xfa, 0x05); /* set bits 0,2 */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x0f, 0xff, 0x20); /* set bit 5 */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x17, 0xff, 0x02); /* set bit 1 */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x2f, 0xff, 0x02); /* set bit 1 */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x60, 0xfb, 0x00); /* clear bit 2 */
 }
 
 /* ------------------------------------------------------------------ */
@@ -602,11 +602,11 @@ static int component_poll_signal(
 		mst_bank(hdcap, 0x00);
 
 		/* trigger timing measurement? */
-		i2c_write(hdcap, ADDR_MST3367, 0x0e, 0x40);
+		u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0e, 0x40);
 
-		status = i2c_read(hdcap, ADDR_MST3367, 0x14);
+		status = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x14);
 		/* needed ? */
-		i2c_read(hdcap, ADDR_MST3367, 0x15);
+		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x15);
 
 		/* Check signal presence from 0x14 bits 7,4 */
 		signal_type = status & 0x90;
@@ -617,31 +617,31 @@ static int component_poll_signal(
 			signal_count = 0;
 
 		/* Read H timing */
-		htotal = ((i2c_read(hdcap, ADDR_MST3367, 0x57) & 0x3f) << 8) |
-			  i2c_read(hdcap, ADDR_MST3367, 0x58);
+		htotal = ((u3hc_i2c_read(hdcap, ADDR_MST3367, 0x57) & 0x3f) << 8) |
+			  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x58);
 
 		/* scale ADC sample rate to htotal like Windows driver */
 		if (htotal > 0)
-			i2c_write(hdcap, ADDR_MST3367, 0x11,
+			u3hc_i2c_write(hdcap, ADDR_MST3367, 0x11,
 				  (htotal < 0x401 ? 0x400 : htotal) >> 7);
 
 		/* Read V timing, idk if this is actually needed? */
-		i2c_read(hdcap, ADDR_MST3367, 0x59);
-		i2c_read(hdcap, ADDR_MST3367, 0x5a);
+		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x59);
+		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5a);
 
 		/* Read Vtotal */
-		i2c_read(hdcap, ADDR_MST3367, 0x5b);
-		i2c_read(hdcap, ADDR_MST3367, 0x5c);
+		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5b);
+		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5c);
 
-		i2c_read(hdcap, ADDR_MST3367, 0x5d);
-		i2c_read(hdcap, ADDR_MST3367, 0x5e);
-		i2c_read(hdcap, ADDR_MST3367, 0x5f);
+		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5d);
+		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5e);
+		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5f);
 
 		/* PLL status */
 		mst_bank(hdcap, 0x02);
-		i2c_read(hdcap, ADDR_MST3367, 0x11);
-		i2c_read(hdcap, ADDR_MST3367, 0x12);
-		i2c_write(hdcap, ADDR_MST3367, 0x20, 0x00);
+		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x11);
+		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x12);
+		u3hc_i2c_write(hdcap, ADDR_MST3367, 0x20, 0x00);
 
 		if (k % 10 == 0)
 			dev_info(hdcap->dev,
@@ -655,8 +655,8 @@ static int component_poll_signal(
 
 		/* Signal stable - read vtotal and determine format */
 		mst_bank(hdcap, 0x00);
-		vtotal = ((i2c_read(hdcap, ADDR_MST3367, 0x5b) & 0x07) << 8) |
-			  i2c_read(hdcap, ADDR_MST3367, 0x5c);
+		vtotal = ((u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5b) & 0x07) << 8) |
+			  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5c);
 
 		dev_info(hdcap->dev,
 			"component locked: vtotal=%d htotal=%d 0x14=0x%02x\n",
@@ -696,18 +696,18 @@ int usb3hdcap_hdmi_init(struct usb3hdcap *hdcap)
 	mst3367_config(hdcap);
 
 	/* TW9900 power-down */
-	i2c_write(hdcap, ADDR_TW9900, 0x06, 0x0e);
-	i2c_write(hdcap, ADDR_TW9900, 0x1a, 0x40);
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x06, 0x0e);
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x1a, 0x40);
 
 	/* CPLD init with HDMI input mux */
 	cpld_init(hdcap, 0x02);
 
-	i2c_read(hdcap, ADDR_CPLD, 0x20);
-	i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
+	u3hc_i2c_read(hdcap, ADDR_CPLD, 0x20);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
 
 	/* probably not needed */
-	i2c_read(hdcap, ADDR_CPLD, 0x20);
-	i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
+	u3hc_i2c_read(hdcap, ADDR_CPLD, 0x20);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
 
 	ret = hdmi_poll_signal(hdcap);
 	if (ret < 0)
@@ -736,19 +736,19 @@ int usb3hdcap_component_init(struct usb3hdcap *hdcap)
 	mst3367_config(hdcap);
 
 	/* TW9900 power-down */
-	i2c_write(hdcap, ADDR_TW9900, 0x06, 0x0e);
-	i2c_write(hdcap, ADDR_TW9900, 0x1a, 0x40);
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x06, 0x0e);
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x1a, 0x40);
 
 	/* CPLD init with component input mux */
 	cpld_init(hdcap, 0x80);
 
 	/* Component source select (MST3367 internal ADC for YPbPr) */
 	mst_bank(hdcap, 0x00);
-	i2c_write(hdcap, ADDR_MST3367, 0x51, 0x21);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x51, 0x21);
 
 	/* Component CPLD routing, bit 4 = component input? */
-	i2c_read(hdcap, ADDR_CPLD, 0x20);
-	i2c_write(hdcap, ADDR_CPLD, 0x20, 0x15);
+	u3hc_i2c_read(hdcap, ADDR_CPLD, 0x20);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x15);
 
 	mst3367_adc_config(hdcap);
 
@@ -757,15 +757,15 @@ int usb3hdcap_component_init(struct usb3hdcap *hdcap)
 	msleep(1000);
 
 	/* Final CPLD verify */
-	i2c_read(hdcap, ADDR_CPLD, 0x20);
-	i2c_write(hdcap, ADDR_CPLD, 0x20, 0x15);
+	u3hc_i2c_read(hdcap, ADDR_CPLD, 0x20);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x15);
 
 	ret = component_poll_signal(hdcap, &mode);
 	if (ret < 0)
 		return ret;
 
 	/* CPLD data path enable (bit 1 set when CPLD 0x20 bit 4 is set) */
-	i2c_rmw(hdcap, ADDR_CPLD, 0x00, 0xff, 0x02);
+	u3hc_i2c_rmw(hdcap, ADDR_CPLD, 0x00, 0xff, 0x02);
 
 	component_write_scaler(hdcap, mode);
 

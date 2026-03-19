@@ -170,14 +170,14 @@ static int mcu_i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg)
 	return val;
 }
 
-int i2c_write(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 val)
+int u3hc_i2c_write(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 val)
 {
 	if (hdcap->has_mcu)
 		return mcu_i2c_write(hdcap, addr, reg, val);
 	return vendor_out(hdcap, REQ_I2C, addr, reg, &val, 1);
 }
 
-int i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg)
+int u3hc_i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg)
 {
 	u8 val;
 	int ret;
@@ -195,23 +195,23 @@ int i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg)
 	return val;
 }
 
-int i2c_rmw(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits)
+int u3hc_i2c_rmw(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits)
 {
-	int val = i2c_read(hdcap, addr, reg);
+	int val = u3hc_i2c_read(hdcap, addr, reg);
 
 	if (val < 0)
 		return val;
-	return i2c_write(hdcap, addr, reg, (val & mask) | bits);
+	return u3hc_i2c_write(hdcap, addr, reg, (val & mask) | bits);
 }
 
-int i2c_rmw_get_old(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits, u8 *old)
+int u3hc_i2c_rmw_get_old(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits, u8 *old)
 {
-	int val = i2c_read(hdcap, addr, reg);
+	int val = u3hc_i2c_read(hdcap, addr, reg);
 
 	if (val < 0)
 		return val;
 	*old = val;
-	return i2c_write(hdcap, addr, reg, (val & mask) | bits);
+	return u3hc_i2c_write(hdcap, addr, reg, (val & mask) | bits);
 }
 
 /* CheckIsMCUExist() */
@@ -679,16 +679,16 @@ static int usb3hdcap_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	switch (ctrl->id) {
 	case V4L2_CID_BRIGHTNESS:
-		return i2c_write(hdcap, ADDR_TW9900, 0x10, (u8)ctrl->val);
+		return u3hc_i2c_write(hdcap, ADDR_TW9900, 0x10, (u8)ctrl->val);
 	case V4L2_CID_CONTRAST:
-		return i2c_write(hdcap, ADDR_TW9900, 0x11, ctrl->val);
+		return u3hc_i2c_write(hdcap, ADDR_TW9900, 0x11, ctrl->val);
 	case V4L2_CID_SATURATION:
-		i2c_write(hdcap, ADDR_TW9900, 0x13, ctrl->val);
-		return i2c_write(hdcap, ADDR_TW9900, 0x14, ctrl->val);
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x13, ctrl->val);
+		return u3hc_i2c_write(hdcap, ADDR_TW9900, 0x14, ctrl->val);
 	case V4L2_CID_HUE:
-		return i2c_write(hdcap, ADDR_TW9900, 0x15, (u8)ctrl->val);
+		return u3hc_i2c_write(hdcap, ADDR_TW9900, 0x15, (u8)ctrl->val);
 	case V4L2_CID_SHARPNESS:
-		return i2c_write(hdcap, ADDR_TW9900, 0x12, ctrl->val);
+		return u3hc_i2c_write(hdcap, ADDR_TW9900, 0x12, ctrl->val);
 	default:
 		return -EINVAL;
 	}
@@ -730,22 +730,11 @@ static const struct v4l2_ioctl_ops usb3hdcap_ioctl_ops = {
 	.vidioc_streamoff = vb2_ioctl_streamoff,
 };
 
-static int usb3hdcap_open(struct file *file)
-{
-	int ret;
-
-	ret = v4l2_fh_open(file);
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
 static const struct v4l2_file_operations usb3hdcap_fops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = video_ioctl2,
 	.mmap = vb2_fop_mmap,
-	.open = usb3hdcap_open,
+	.open = v4l2_fh_open,
 	.release = vb2_fop_release,
 	.read = vb2_fop_read,
 	.poll = vb2_fop_poll,

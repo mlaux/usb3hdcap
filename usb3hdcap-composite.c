@@ -31,10 +31,10 @@ static void usb3hdcap_detect_std(struct usb3hdcap *hdcap)
 
 	/* 0x80 = start detection */
 	/* 0x03 = enable recognition of PAL and NTSC only */
-	i2c_write(hdcap, ADDR_TW9900, 0x1d, 0x83);
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x1d, 0x83);
 
 	for (k = 0; k < 10; k++) {
-		sdt = i2c_read(hdcap, ADDR_TW9900, TW9900_SDT);
+		sdt = u3hc_i2c_read(hdcap, ADDR_TW9900, TW9900_SDT);
 		if (!(sdt & 0x80)) {
 			break;
 		}
@@ -73,7 +73,7 @@ static void usb3hdcap_detect_size(struct usb3hdcap *hdcap)
 	hdcap->width = NTSC_WIDTH;
 	hdcap->height = half_h;
 
-	status = i2c_read(hdcap, ADDR_TW9900, TW9900_SDTR);
+	status = u3hc_i2c_read(hdcap, ADDR_TW9900, TW9900_SDTR);
 	if (status >= 0 && (status & TW9900_NINTL)) {
 		hdcap->interlaced = 0;
 		dev_info(hdcap->dev, "NINTL=1: %dp detected (SDTR=0x%02x)\n",
@@ -90,66 +90,66 @@ int usb3hdcap_composite_init(struct usb3hdcap *hdcap)
 	int k, status;
 
 	/* disable MST3367 */
-	i2c_write(hdcap, ADDR_MST3367, 0x00, 0x00); /* bank 0 */
-	i2c_write(hdcap, ADDR_MST3367, 0x51, 0x80);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x00, 0x00); /* bank 0 */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x51, 0x80);
 
 	/* disable TW9900 */
-	i2c_write(hdcap, ADDR_TW9900, 0x06, 0x0e); /* ACNTL_I */
-	i2c_write(hdcap, ADDR_TW9900, 0x1a, 0x40); /* ACNTL_II */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x06, 0x0e); /* ACNTL_I */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x1a, 0x40); /* ACNTL_II */
 
 	/* select TW9900 input of cpld? */
 	/* from windows driver */
-	status = i2c_read(hdcap, ADDR_CPLD, 0x3b);
+	status = u3hc_i2c_read(hdcap, ADDR_CPLD, 0x3b);
 	if (status != 0) {
-		i2c_write(hdcap, ADDR_CPLD, 0x3b, 0x80);
+		u3hc_i2c_write(hdcap, ADDR_CPLD, 0x3b, 0x80);
 	}
-	i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
-	i2c_write(hdcap, ADDR_CPLD, 0x00, 0x01);
-	i2c_write(hdcap, ADDR_CPLD, 0x10, 0xfe);
-	i2c_write(hdcap, ADDR_CPLD, 0x20, 0x75);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x00, 0x01);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x10, 0xfe);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x75);
 
 	/* Main TW9900 configuration */
-	i2c_write(hdcap, ADDR_TW9900, 0x06, 0x00); /* ACNTL_I */
-	i2c_write(hdcap, ADDR_TW9900, 0x03, 0xa2); /* OPFORM */
-	i2c_write(hdcap, ADDR_TW9900, 0x05, 0x01); /* OPCNTL_I */
-	i2c_write(hdcap, ADDR_TW9900, 0x08, 0x14); /* VDELAY_LO */
-	i2c_write(hdcap, ADDR_TW9900, 0x09, 0xf2); /* VACTIVE_LO */
-	i2c_write(hdcap, ADDR_TW9900, 0x0a, 0x0b); /* HDELAY_LO */
-	i2c_write(hdcap, ADDR_TW9900, 0x0b, 0xd2); /* HACTIVE_LO */
-	i2c_write(hdcap, ADDR_TW9900, 0x19, 0x57); /* VBICNTL */
-	i2c_write(hdcap, ADDR_TW9900, 0x1a, 0x0f); /* ACNTL_II */
-	i2c_write(hdcap, ADDR_TW9900, 0x1b, 0x00); /* OPCNTL_II */
-	i2c_write(hdcap, ADDR_TW9900, 0x1c, 0x07); /* SDT: auto-detect */
-	i2c_write(hdcap, ADDR_TW9900, 0x28, 0x0c); /* VCNTL1 */
-	i2c_write(hdcap, ADDR_TW9900, 0x29, 0x03); /* VCNTL2 */
-	i2c_write(hdcap, ADDR_TW9900, 0x2d, 0x07); /* MISC1 */
-	i2c_write(hdcap, ADDR_TW9900, 0x2f, 0x06); /* MISC2 */
-	i2c_write(hdcap, ADDR_TW9900, 0x4c, 0x01); /* ANAPLLCTL */
-	i2c_write(hdcap, ADDR_TW9900, 0x55, 0x00); /* VVBI */
-	i2c_write(hdcap, ADDR_TW9900, 0x6b, 0x26); /* HSBEGIN */
-	i2c_write(hdcap, ADDR_TW9900, 0x6c, 0x36); /* HSEND */
-	i2c_write(hdcap, ADDR_TW9900, 0x6d, 0xf0); /* OVSDLY */
-	i2c_write(hdcap, ADDR_TW9900, 0x6e, 0x28); /* OVSEND */
-	i2c_write(hdcap, ADDR_TW9900, 0x06, 0x80); /* ACNTL_I */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x06, 0x00); /* ACNTL_I */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x03, 0xa2); /* OPFORM */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x05, 0x01); /* OPCNTL_I */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x08, 0x14); /* VDELAY_LO */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x09, 0xf2); /* VACTIVE_LO */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x0a, 0x0b); /* HDELAY_LO */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x0b, 0xd2); /* HACTIVE_LO */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x19, 0x57); /* VBICNTL */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x1a, 0x0f); /* ACNTL_II */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x1b, 0x00); /* OPCNTL_II */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x1c, 0x07); /* SDT: auto-detect */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x28, 0x0c); /* VCNTL1 */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x29, 0x03); /* VCNTL2 */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x2d, 0x07); /* MISC1 */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x2f, 0x06); /* MISC2 */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x4c, 0x01); /* ANAPLLCTL */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x55, 0x00); /* VVBI */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x6b, 0x26); /* HSBEGIN */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x6c, 0x36); /* HSEND */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x6d, 0xf0); /* OVSDLY */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x6e, 0x28); /* OVSEND */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x06, 0x80); /* ACNTL_I */
 	if (hdcap->input == INPUT_SVIDEO) {
 		/* "Input crystal clock frequency is 27MHz" */
 		/* IFSEL 01 for S-Video, YSEL 01 for Y on Mux1 */
-		i2c_write(hdcap, ADDR_TW9900, 0x02, 0x54);
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x02, 0x54);
 		/* "internal current reference 2" + both luma and chroma ADCs on */
-		i2c_write(hdcap, ADDR_TW9900, 0x06, 0x40);
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x06, 0x40);
 
 	} else {
 		/* IFSEL 00 for composite, YSEL 00 for Y on Mux0 */
-		i2c_write(hdcap, ADDR_TW9900, 0x02, 0x40);
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x02, 0x40);
 		/* "internal current reference 2" + chroma ADC off */
-		i2c_write(hdcap, ADDR_TW9900, 0x06, 0x42);
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x06, 0x42);
 	}
 	v4l2_ctrl_handler_setup(&hdcap->ctrl);
 
 	vendor_out(hdcap, REQ_STREAM, 0x0000, 0, NULL, 0);
 
 	for (k = 0; k < 10; k++) {
-		status = i2c_read(hdcap, ADDR_TW9900, 0x01);
+		status = u3hc_i2c_read(hdcap, ADDR_TW9900, 0x01);
 
 		/* 0x40 = "Horizontal sync PLL is locked to the incoming video source"
 		   0x08 = "Vertical logic is locked to the incoming video source" */
@@ -171,23 +171,23 @@ int usb3hdcap_composite_init(struct usb3hdcap *hdcap)
 
 	/* Adjust for PAL vs NTSC */
 	if (hdcap->std & V4L2_STD_625_50) {
-		i2c_rmw(hdcap, ADDR_TW9900, 0x07, 0x0f, 0x10); /* CROP_HI: set bit 4 */
-		i2c_write(hdcap, ADDR_TW9900, 0x08, 0x19); /* VDELAY_LO */
-		i2c_write(hdcap, ADDR_TW9900, 0x09, 0x20); /* VACTIVE_LO */
-		i2c_write(hdcap, ADDR_TW9900, 0x0a, 0x0a); /* HDELAY_LO */
-		i2c_write(hdcap, ADDR_TW9900, 0x0b, 0xd0); /* HACTIVE_LO */
-		i2c_rmw(hdcap, ADDR_TW9900, 0x55, 0xef, 0x00); /* VVBI: clear bit 4 */
+		u3hc_i2c_rmw(hdcap, ADDR_TW9900, 0x07, 0x0f, 0x10); /* CROP_HI: set bit 4 */
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x08, 0x19); /* VDELAY_LO */
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x09, 0x20); /* VACTIVE_LO */
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x0a, 0x0a); /* HDELAY_LO */
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x0b, 0xd0); /* HACTIVE_LO */
+		u3hc_i2c_rmw(hdcap, ADDR_TW9900, 0x55, 0xef, 0x00); /* VVBI: clear bit 4 */
 	} else {
-		i2c_rmw(hdcap, ADDR_TW9900, 0x07, 0x0f, 0x00); /* CROP_HI: clear bit 4 */
-		i2c_write(hdcap, ADDR_TW9900, 0x08, 0x14); /* VDELAY_LO */
-		i2c_write(hdcap, ADDR_TW9900, 0x09, 0xf2); /* VACTIVE_LO */
-		i2c_write(hdcap, ADDR_TW9900, 0x0a, 0x10); /* HDELAY_LO */
-		i2c_write(hdcap, ADDR_TW9900, 0x0b, 0xd0); /* HACTIVE_LO */
-		i2c_rmw(hdcap, ADDR_TW9900, 0x55, 0xef, 0x10); /* VVBI: set bit 4 */
+		u3hc_i2c_rmw(hdcap, ADDR_TW9900, 0x07, 0x0f, 0x00); /* CROP_HI: clear bit 4 */
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x08, 0x14); /* VDELAY_LO */
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x09, 0xf2); /* VACTIVE_LO */
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x0a, 0x10); /* HDELAY_LO */
+		u3hc_i2c_write(hdcap, ADDR_TW9900, 0x0b, 0xd0); /* HACTIVE_LO */
+		u3hc_i2c_rmw(hdcap, ADDR_TW9900, 0x55, 0xef, 0x10); /* VVBI: set bit 4 */
 	}
-	i2c_write(hdcap, ADDR_TW9900, 0x0d, 0x00); /* CNTRL2 */
-	i2c_write(hdcap, ADDR_TW9900, 0x0e, 0x11); /* SDT_NOISE */
-	i2c_write(hdcap, ADDR_TW9900, 0x0f, 0x00); /* LUMA_CTL */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x0d, 0x00); /* CNTRL2 */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x0e, 0x11); /* SDT_NOISE */
+	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x0f, 0x00); /* LUMA_CTL */
 
 	return 0;
 }
