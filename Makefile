@@ -1,6 +1,7 @@
 obj-m += usb3hdcap.o
 usb3hdcap-y := usb3hdcap-core.o usb3hdcap-video.o usb3hdcap-composite.o \
                usb3hdcap-hdmi.o usb3hdcap-audio.o
+KCFLAGS=-W
 KDIR ?= /lib/modules/$(shell uname -r)/build
 
 all:

@@ -48,6 +48,8 @@ static void usb3hdcap_detect_std(struct usb3hdcap *hdcap)
 		dev_info(hdcap->dev, "Non-PAL/NTSC detected (SDT=0x%02x)\n", sdt);
 		break;
 	}
+
+	hdcap->dv_timings_present = 0;
 }
 
 /* Detect 240p/288p (non-interlaced) vs 480i/576i */

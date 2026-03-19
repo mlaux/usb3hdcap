@@ -183,6 +183,7 @@ struct usb3hdcap {
 	/* MST3367 state */
 	int mst_current_bank;
 	struct v4l2_dv_timings detected_timings;
+	int dv_timings_present;
 
 	/* ALSA audio */
 	struct snd_card *snd;

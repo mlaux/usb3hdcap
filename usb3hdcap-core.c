@@ -38,6 +38,7 @@
 #include <linux/mutex.h>
 #include <media/v4l2-common.h>
 #include <media/v4l2-ioctl.h>
+#include <media/v4l2-event.h>
 #include <media/videobuf2-vmalloc.h>
 
 #include "usb3hdcap.h"
@@ -303,8 +304,8 @@ static int usb3hdcap_device_init(struct usb3hdcap *hdcap)
 int usb3hdcap_hw_init(struct usb3hdcap *hdcap)
 {
 	/* Clear stale detection state from previous input */
-	memset(&hdcap->detected_timings, 0, sizeof(hdcap->detected_timings));
 	hdcap->std = 0;
+	hdcap->dv_timings_present = 0;
 
 	usb3hdcap_device_init(hdcap);
 	usb3hdcap_cs53l21_init(hdcap);
@@ -361,7 +362,7 @@ static int usb3hdcap_enum_input(struct file *file, void *priv,
 	case INPUT_COMPONENT:
 		strscpy(i->name, "Component", sizeof(i->name));
 		i->std = 0;
-		i->capabilities = 0;
+		i->capabilities = V4L2_IN_CAP_DV_TIMINGS;
 		break;
 	case INPUT_HDMI:
 		strscpy(i->name, "HDMI", sizeof(i->name));
@@ -420,6 +421,7 @@ static int usb3hdcap_s_std(struct file *file, void *priv, v4l2_std_id norm)
 	if (!(norm & USB3HDCAP_V4L2_STDS))
 		return -EINVAL;
 
+	/* no-op, input source determines the standard */
 	return 0;
 }
 
@@ -434,8 +436,8 @@ static const struct v4l2_dv_timings_cap usb3hdcap_timings_cap = {
 		.max_width = 1920,
 		.min_height = 480,
 		.max_height = 1080,
-		.min_pixelclock = 27000000,
-		.max_pixelclock = 148500000,
+		.min_pixelclock = 13500000, /* 480i */
+		.max_pixelclock = 148500000, /* 1080p60 */
 		.standards = V4L2_DV_BT_STD_CEA861,
 		.capabilities = V4L2_DV_BT_CAP_PROGRESSIVE |
 				V4L2_DV_BT_CAP_INTERLACED,
@@ -449,7 +451,8 @@ static int usb3hdcap_g_dv_timings(
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	if (!hdcap->detected_timings.type)
+	/* composite/S-Video -> no DV timings */
+	if (!hdcap->dv_timings_present)
 		return -ENODATA;
 
 	*timings = hdcap->detected_timings;
@@ -463,7 +466,7 @@ static int usb3hdcap_s_dv_timings(
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	if (!hdcap->detected_timings.type)
+	if (!hdcap->dv_timings_present)
 		return -ENODATA;
 
 	/* Return the detected timing - we can't change it */
@@ -480,9 +483,11 @@ static int usb3hdcap_enum_dv_timings(
 
 	if (timings->index > 0)
 		return -EINVAL;
-	if (!hdcap->detected_timings.type)
+	if (!hdcap->dv_timings_present)
 		return -ENODATA;
 
+	/* one entry: the current timings, because that's all that is supported
+	   until you unplug the cable */
 	timings->timings = hdcap->detected_timings;
 	return 0;
 }
@@ -494,7 +499,8 @@ static int usb3hdcap_dv_timings_cap(
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	if (!hdcap->detected_timings.type)
+	/* if you're not on HDMI/component, DV timings are not supported */
+	if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)
 		return -ENODATA;
 
 	*cap = usb3hdcap_timings_cap;
@@ -508,7 +514,7 @@ static int usb3hdcap_query_dv_timings(
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	if (!hdcap->detected_timings.type)
+	if (!hdcap->dv_timings_present)
 		return -ENODATA;
 
 	*timings = hdcap->detected_timings;
@@ -727,6 +733,9 @@ static const struct v4l2_ioctl_ops usb3hdcap_ioctl_ops = {
 	.vidioc_dqbuf = vb2_ioctl_dqbuf,
 	.vidioc_streamon = vb2_ioctl_streamon,
 	.vidioc_streamoff = vb2_ioctl_streamoff,
+
+	.vidioc_subscribe_event = v4l2_ctrl_subscribe_event,
+	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
 };
 
 static const struct v4l2_file_operations usb3hdcap_fops = {

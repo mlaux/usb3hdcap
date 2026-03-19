@@ -25,8 +25,6 @@ struct component_mode {
 	u16 scaler_htotal;
 	u16 hde_off;
 	u8 vde_off;
-	/* V4L2: SD interlaced modes use std, HD modes use timings */
-	v4l2_std_id std;
 	struct v4l2_dv_timings timings;
 };
 
@@ -41,25 +39,25 @@ struct component_mode {
 static const struct component_mode component_modes[] = {
 	/* 480i */
 	{  250,  275,   720,  240, 60, 1, 0x08,0x08,0x08,0x18, 0x44,0x04, 0x35a, 0x76, 0x12,
-	   V4L2_STD_525_60 },
+	   V4L2_DV_BT_CEA_720X480I59_94 },
 	/* 576i */
 	{  300,  320,   720,  288, 50, 1, 0x08,0x08,0x08,0x18, 0x44,0x04, 0x360, 0x83, 0x16,
-	   V4L2_STD_625_50 },
+	   V4L2_DV_BT_CEA_720X576I50 },
 	/* 480p */
 	{  515,  535,   720,  480, 60, 0, 0x20,0x08,0x08,0x18, 0x33,0x03, 0x35a, 0x79, 0x24,
-	   0, V4L2_DV_BT_CEA_720X480P59_94 },
+	   V4L2_DV_BT_CEA_720X480P59_94 },
 	/* 1080i */
 	{  555,  585,  1920,  540, 60, 1, 0x58,0x38,0x20,0x30, 0x11,0x01, 0x898, 0xeb, 0x14,
-	   0, V4L2_DV_BT_CEA_1920X1080I60 },
+	   V4L2_DV_BT_CEA_1920X1080I60 },
 	/* 576p */
 	{  615,  635,   720,  576, 50, 0, 0x18,0x08,0x08,0x18, 0x33,0x03, 0x360, 0x83, 0x2c,
-	   0, V4L2_DV_BT_CEA_720X576P50 },
+	   V4L2_DV_BT_CEA_720X576P50 },
 	/* 720p */
 	{  740,  760,  1280,  720, 60, 0, 0x58,0x38,0x20,0x30, 0x11,0x01, 0x672,0x12b, 0x19,
-	   0, V4L2_DV_BT_CEA_1280X720P60 },
+	   V4L2_DV_BT_CEA_1280X720P60 },
 	/* 1080p */
 	{ 1115, 1135,  1920, 1080, 60, 0, 0xe8,0x38,0x30,0xa0, 0x00,0x00, 0x898, 0xc1, 0x29,
-	   0, V4L2_DV_BT_CEA_1920X1080P60 },
+	   V4L2_DV_BT_CEA_1920X1080P60 },
 };
 
 /*
@@ -427,6 +425,8 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 				return -ERANGE;
 			}
 			hdcap->detected_timings = *std;
+			hdcap->dv_timings_present = 1;
+			hdcap->std = 0; /* no SD standard */
 			hdcap->width = std->bt.width;
 			hdcap->height = std->bt.height;
 			hdcap->bpl = hdcap->width * 2;
@@ -672,8 +672,9 @@ static int component_poll_signal(
 		hdcap->height = mode->height;
 		hdcap->interlaced = mode->interlaced;
 		hdcap->bpl = hdcap->width * 2;
+		hdcap->std = 0; /* no SD standard */
+		hdcap->dv_timings_present = 1;
 		hdcap->detected_timings = mode->timings;
-		hdcap->std = mode->std;
 		*detected = mode;
 		return 0;
 	}
