@@ -11,6 +11,8 @@ struct snd_card;
 struct snd_pcm_substream;
 struct vb2_ops;
 
+#define USB3HDCAP_V4L2_STDS (V4L2_STD_NTSC | V4L2_STD_PAL)
+
 /* NTSC SD frame format */
 #define SD_WIDTH       720
 #define NTSC_HEIGHT    480

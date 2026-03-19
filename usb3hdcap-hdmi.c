@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * USB3HDCAP HDMI init - MST3367 setup, signal detection, CSC
+ * USB3HDCAP MST3367 support: HDMI and component
  */
 
 #include <linux/kernel.h>
@@ -64,7 +64,7 @@ static const struct component_mode component_modes[] = {
 
 /*
  * Known CEA timing table - maps (htotal, vtotal, hactive) to full
- * v4l2_dv_timings.  HD htotal = standard * 1.5 (MST3367 counter rate).
+ * v4l2_dv_timings. HD htotal = standard * 1.5 (MST3367 counter rate?)
  * 1080p30 omitted: same htotal/vtotal as 1080p60, can't distinguish.
  */
 struct hdmi_std {
@@ -115,7 +115,6 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 	/* Bank 0 initial config */
 	mst_bank(hdcap, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x51, 0x80);
-	//u3hc_i2c_write(hdcap, ADDR_MST3367, 0x13, 0x08);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb7, 0x02);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x41, 0x6f);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x00);
@@ -527,17 +526,17 @@ static void component_write_scaler(
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x06, m->reg_06);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, m->reg_07);
 
-	/* cutoff */
+	/* cutoffs? */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x08, 0xa0);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x09, 0xc0);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0a, 0xa0);
 
-	/* gain */
+	/* gains? */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0b, 0x80);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0c, 0x60);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0d, 0x80);
 
-	/* no idea */
+	/* not sure */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x18, 0x10);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x19, 0x10);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1a, 0x10);
@@ -625,7 +624,7 @@ static int component_poll_signal(
 			u3hc_i2c_write(hdcap, ADDR_MST3367, 0x11,
 				  (htotal < 0x401 ? 0x400 : htotal) >> 7);
 
-		/* Read V timing, idk if this is actually needed? */
+		/* Read V timing, not sure if this is actually needed? */
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x59);
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5a);
 

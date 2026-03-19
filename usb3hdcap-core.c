@@ -44,8 +44,6 @@
 #define USB3HDCAP_VID 0x1164
 #define USB3HDCAP_PID 0xf533
 #define XCAPTURE1_PID 0xf531
-#define USB3HDCAP_V4L2_STDS (V4L2_STD_525_60 | V4L2_STD_PAL | \
-			V4L2_STD_PAL_Nc | V4L2_STD_SECAM)
 
 /* ------------------------------------------------------------------ */
 /* USB control transfer helpers                                       */
@@ -154,12 +152,12 @@ static int mcu_i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg)
 	u8 val;
 	int ret;
 
-	/* Write phase: send target addr, rx length, and register */
+	/* send target addr, rx length, and register */
 	ret = vendor_out(hdcap, REQ_I2C, 0x5066, 0, tx, 3);
 	if (ret < 0)
 		return ret;
 
-	/* Read phase: retrieve the result */
+	/* Retrieve the result */
 	ret = vendor_in(hdcap, REQ_I2C, 0x5066, 0, &val, 1);
 	if (ret < 0) {
 		dev_err(hdcap->dev, "mcu_i2c_read 0x%02x reg 0x%02x: %d\n",
@@ -223,11 +221,11 @@ static void usb3hdcap_probe_mcu(struct usb3hdcap *hdcap)
 
 	hdcap->has_mcu = 0;
 
-	/* Assert CPLD GPIO 0x39 to wake MCU */
+	/* Assert CPLD GPIO 0x39 to wake MCU? */
 	vendor_out(hdcap, REQ_GPIO, 0xc039, 0, NULL, 0);
 	vendor_out(hdcap, REQ_GPIO, 0x4134, 0, NULL, 0);
 
-	/* Poll GPIO 0x39 until MCU signals ready (up to 1 second) */
+	/* Poll GPIO 0x39 until MCU signals ready */
 	for (k = 0; k < 100; k++) {
 		msleep(10);
 		ret = vendor_in(hdcap, REQ_GPIO, 0x39, 0, rx, 1);
@@ -268,20 +266,20 @@ static int usb3hdcap_device_init(struct usb3hdcap *hdcap)
 	vendor_out(hdcap, REQ_INIT,   0x0000, 0, NULL, 0);
 	vendor_out(hdcap, REQ_UNK_C7, 0x0064, 0, NULL, 0);
 	/* Windows driver does this but is always fails? */
-	vendor_out(hdcap, 0xc5, 0x0000, 0, NULL, 0);
+	/* vendor_out(hdcap, 0xc5, 0x0000, 0, NULL, 0); */
 	vendor_out(hdcap, REQ_STREAM, 0x0000, 0, NULL, 0);
 	vendor_out(hdcap, REQ_STREAM, 0x0000, 0, NULL, 0);
 
 	/*
-		just replay what the windows driver does
-		FUN_14022e3f4(param_1,0x402d);
-		FUN_14022e3f4(param_1,0x12d);
-		FUN_140001220(0x32);
-		FUN_14022e3f4(param_1,0x2d);
-		FUN_140001220(0x32);
-		FUN_14022e3f4(param_1,0x12d);
-		FUN_140001220(0x32);
-		FUN_14022e3f4(param_1,0x802d);
+		just replay what the windows driver does:
+			FUN_14022e3f4(param_1,0x402d);
+			FUN_14022e3f4(param_1,0x12d);
+			FUN_140001220(0x32);
+			FUN_14022e3f4(param_1,0x2d);
+			FUN_140001220(0x32);
+			FUN_14022e3f4(param_1,0x12d);
+			FUN_140001220(0x32);
+			FUN_14022e3f4(param_1,0x802d);
 	*/
 
 	vendor_out(hdcap, REQ_GPIO, 0x402d, 0, NULL, 0);
