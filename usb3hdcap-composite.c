@@ -158,7 +158,7 @@ int usb3hdcap_composite_init(struct usb3hdcap *hdcap)
 	usb3hdcap_detect_size(hdcap);
 
 	/* Adjust for PAL vs NTSC */
-	if (hdcap->std & V4L2_STD_NTSC) {
+	if (hdcap->std & V4L2_STD_PAL) {
 		u3hc_i2c_rmw(hdcap, ADDR_TW9900, TW9900_CROP_HI, 0x0f, 0x10);
 		u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_VDELAY_LO, 0x19);
 		u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_VACTIVE_LO, 0x20);
