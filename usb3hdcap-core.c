@@ -437,15 +437,11 @@ static int usb3hdcap_s_std(struct file *file, void *priv, v4l2_std_id norm)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	if (!(hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)) {
-		dev_warn(hdcap->dev, "input set to %d\n", hdcap->input);
+	if (!(hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO))
 		return -ENODATA;
-	}
 
-	if (!(norm & USB3HDCAP_V4L2_STDS)) {
-		dev_warn(hdcap->dev, "no match, requested %llu\n", norm);
+	if (!(norm & USB3HDCAP_V4L2_STDS))
 		return -EINVAL;
-	}
 
 	hdcap->requested_std = norm;
 	return 0;
