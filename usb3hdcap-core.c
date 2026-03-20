@@ -389,12 +389,25 @@ static int usb3hdcap_fmt_vid_cap(struct file *file, void *priv,
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	f->fmt.pix.width = hdcap->width;
-	f->fmt.pix.height = hdcap->height;
+	int width = hdcap->width;
+	int height = hdcap->height;
+	int interlaced = hdcap->interlaced;
+
+	/* If timings were explicitly set, report format matching those
+	 * timings instead of what was detected from the signal */
+	if (hdcap->requested_timings_present) {
+		const struct v4l2_bt_timings *bt = &hdcap->requested_timings.bt;
+		width = bt->width;
+		height = bt->interlaced ? bt->height / 2 : bt->height;
+		interlaced = bt->interlaced;
+	}
+
+	f->fmt.pix.width = width;
+	f->fmt.pix.height = height;
 	f->fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
-	f->fmt.pix.field = hdcap->interlaced ? V4L2_FIELD_ALTERNATE : V4L2_FIELD_NONE;
-	f->fmt.pix.bytesperline = hdcap->bpl;
-	f->fmt.pix.sizeimage = hdcap->bpl * hdcap->height;
+	f->fmt.pix.field = interlaced ? V4L2_FIELD_ALTERNATE : V4L2_FIELD_NONE;
+	f->fmt.pix.bytesperline = width * 2;
+	f->fmt.pix.sizeimage = width * 2 * height;
 	f->fmt.pix.colorspace = (hdcap->input == INPUT_HDMI) ?
 		V4L2_COLORSPACE_REC709 : V4L2_COLORSPACE_SMPTE170M;
 
