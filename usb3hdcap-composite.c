@@ -138,7 +138,7 @@ int usb3hdcap_composite_init(struct usb3hdcap *hdcap)
 	for (k = 0; k < 10; k++) {
 		status = u3hc_i2c_read(hdcap, ADDR_TW9900, TW9900_CSTATUS);
 
-		/* 
+		/*
 		 * 0x40 = "Horizontal sync PLL is locked to the incoming video source"
 		 * 0x08 = "Vertical logic is locked to the incoming video source"
 		 */

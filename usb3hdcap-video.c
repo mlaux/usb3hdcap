@@ -144,7 +144,7 @@ static void process_data(struct usb3hdcap *hdcap)
 			/* SAV: video line */
 			if (pos + line_size > hdcap->parse_len)
 				break;
-			/* 
+			/*
 			 * -1 because on this hardware, XY byte occupies the first pixel's
 			 * V position
 			 */
@@ -331,10 +331,10 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 	hdcap->cur_buf = NULL;
 
 	if (hdcap->input == INPUT_HDMI) {
-		/* 
+		/*
 		 * this is a register watchlist, interrupt generated n endpoint 1 when
 		 * (value & mask) changes.
-		 * 
+		 *
 		 * struct reg_watch {
 		 *   uint8_t reg;
 		 *   // 0x80-0x82: MST3367 bank n&0x7f, 0x40: look at I2C addr
@@ -385,17 +385,17 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 		return ret;
 	}
 
-	/* 
+	/*
 	 * Select alt setting based on bandwidth:
 	 * alt 1: maxp=1024 burst=16 mult=1 -> 16KB/pkt (SD)
-	 * alt 2: maxp=1024 burst=16 mult=2 -> 32KB/pkt (HD) 
+	 * alt 2: maxp=1024 burst=16 mult=2 -> 32KB/pkt (HD)
 	 */
 	alt = (hdcap->width > 720 || hdcap->height > 576) ? 2 : 1;
 	dev_info(hdcap->dev, "%s: setting alt %d\n", __func__, alt);
 	ret = usb_set_interface(hdcap->usb_dev, 0, alt);
 
 	if (ret < 0) {
-		dev_err(hdcap->dev, "%s: usb_set_interface failed: %d\n", 
+		dev_err(hdcap->dev, "%s: usb_set_interface failed: %d\n",
 			__func__, ret);
 		vfree(hdcap->parse_buf);
 		hdcap->parse_buf = NULL;

@@ -392,7 +392,7 @@ static int usb3hdcap_fmt_vid_cap(struct file *file, void *priv,
 	int height = hdcap->height;
 	int interlaced = hdcap->interlaced;
 
-	/* 
+	/*
 	 * If timings were explicitly set, report format matching those
 	 * timings instead of what was detected from the signal
 	 */
@@ -641,7 +641,7 @@ static void fill_timeperframe(
 	struct usb3hdcap *hdcap,
 	struct v4l2_fract *tf)
 {
-	/* 
+	/*
 	 * using the frame rate here even for interlaced, spec isn't super
 	 * clear on what to do, but adv7180.c does it this way
 	 */
@@ -962,7 +962,7 @@ static int usb3hdcap_probe(struct usb_interface *intf,
 	if (ret < 0)
 		dev_warn(dev, "audio init failed: %d (continuing without audio)\n", ret);
 
-	/* 
+	/*
 	 * Take an extra ref so that disconnect's v4l2_device_put doesn't
 	 * immediately trigger usb3hdcap_release before cleanup is done - based on
 	 * usbtv driver
