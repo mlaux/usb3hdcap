@@ -1,4 +1,6 @@
-v4l2-compliance 1.30.1, 64 bits, 64-bit time_t
+mlaux@miso:~/dev/usb3hdcap-release$ v4l2-compliance -s -d /dev/video2
+v4l2-compliance 1.33.0-5455, 64 bits, 64-bit time_t
+v4l2-compliance SHA: 95ad25f6a77a 2026-03-17 13:08:36
 
 Compliance test for usb3hdcap device /dev/video2:
 
@@ -52,7 +54,9 @@ Output ioctls:
 
 Input/Output configuration ioctls:
 	test VIDIOC_ENUM/G/S/QUERY_STD: OK
-	test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK
+		fail: v4l2-test-io-config.cpp(210): field == V4L2_FIELD_NONE
+		fail: v4l2-test-io-config.cpp(386): Timings check failed for input 2.
+	test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: FAIL
 	test VIDIOC_DV_TIMINGS_CAP: OK
 	test VIDIOC_G/S_EDID: OK (Not Supported)
 
@@ -192,4 +196,19 @@ Buffer ioctls (Input 3):
 	test Requests: OK (Not Supported)
 	test blocking wait: OK
 
-Total for usb3hdcap device /dev/video2: 123, Succeeded: 123, Failed: 0, Warnings: 0
+Test input 0:
+
+Streaming ioctls:
+	test read/write: OK
+	test MMAP (no poll, REQBUFS): OK
+	test MMAP (select, REQBUFS): OK
+	test MMAP (epoll, REQBUFS): OK
+	test MMAP (no poll, CREATE_BUFS): OK
+	test MMAP (select, CREATE_BUFS): OK
+	test MMAP (epoll, CREATE_BUFS): OK
+	test USERPTR (no poll): OK
+	test USERPTR (select): OK
+	test DMABUF (no poll): OK (Not Supported)
+	test DMABUF (select): OK (Not Supported)
+
+Total for usb3hdcap device /dev/video2: 134, Succeeded: 133, Failed: 1, Warnings: 0

@@ -848,6 +848,7 @@ static int video_init(struct usb3hdcap *hdcap)
 	hdcap->vb2q.ops = &usb3hdcap_vb2_ops;
 	hdcap->vb2q.mem_ops = &vb2_vmalloc_memops;
 	hdcap->vb2q.timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
+	hdcap->vb2q.min_queued_buffers = 2;
 	hdcap->vb2q.lock = &hdcap->vb2q_lock;
 	ret = vb2_queue_init(&hdcap->vb2q);
 	if (ret < 0) {

@@ -75,9 +75,9 @@ static void deliver_frame(struct usb3hdcap *hdcap)
 	if (hdcap->interlaced) {
 		buf->vb.field = hdcap->is_second_field ? V4L2_FIELD_BOTTOM : V4L2_FIELD_TOP;
 		buf->vb.sequence = hdcap->sequence;
-		if (hdcap->is_second_field) {
-			buf->vb.sequence++;
-		}
+		if (hdcap->is_second_field)
+			hdcap->sequence++;
+		hdcap->is_second_field ^= 1;
 	} else {
 		buf->vb.field = V4L2_FIELD_NONE;
 		buf->vb.sequence = hdcap->sequence++;
@@ -108,7 +108,6 @@ static void process_video_line(struct usb3hdcap *hdcap, const u8 *video)
 			hdcap->cur_buf = get_next_buf(hdcap);
 	}
 	hdcap->was_blanking = blanking;
-	hdcap->is_second_field = field;
 
 	if (!hdcap->synced || !hdcap->cur_buf || blanking)
 		return;
@@ -444,8 +443,6 @@ static int usb3hdcap_queue_setup(
 	unsigned int q_num_bufs = vb2_get_num_buffers(vq);
 	unsigned int img_size = hdcap->bpl * hdcap->height;
 
-	if (q_num_bufs + *nbuffers < 2)
-		*nbuffers = 2 - q_num_bufs;
 	if (*nplanes) {
 		dev_info(hdcap->dev, "queue_setup: recheck sizes[0]=%u vs %u\n",
 			sizes[0], img_size);
