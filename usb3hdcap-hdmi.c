@@ -425,7 +425,7 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 				return -ERANGE;
 			}
 			hdcap->detected_timings = *std;
-			hdcap->dv_timings_present = 1;
+			hdcap->detected_timings_present = 1;
 			hdcap->std = 0; /* no SD standard */
 			hdcap->width = std->bt.width;
 			hdcap->height = std->bt.height;
@@ -673,7 +673,7 @@ static int component_poll_signal(
 		hdcap->interlaced = mode->interlaced;
 		hdcap->bpl = hdcap->width * 2;
 		hdcap->std = 0; /* no SD standard */
-		hdcap->dv_timings_present = 1;
+		hdcap->detected_timings_present = 1;
 		hdcap->detected_timings = mode->timings;
 		*detected = mode;
 		return 0;

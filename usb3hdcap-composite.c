@@ -29,14 +29,14 @@ static void usb3hdcap_detect_std(struct usb3hdcap *hdcap)
 
 	if (sdt & 0x80) {
 		dev_warn(hdcap->dev, "Detection not done after 1s, using NTSC\n");
-		hdcap->std = V4L2_STD_525_60;
+		hdcap->std = V4L2_STD_NTSC;
 		return;
 	}
 
 	detected = (sdt & TW9900_STDNOW_MASK) >> TW9900_STDNOW_SHIFT;
 	switch (detected) {
 	case TW9900_STD_NTSC_M:
-		hdcap->std = V4L2_STD_525_60;
+		hdcap->std = V4L2_STD_NTSC;
 		dev_info(hdcap->dev, "NTSC detected (SDT=0x%02x)\n", sdt);
 		break;
 	case TW9900_STD_PAL_BDGHI:
@@ -44,19 +44,19 @@ static void usb3hdcap_detect_std(struct usb3hdcap *hdcap)
 		dev_info(hdcap->dev, "PAL detected (SDT=0x%02x)\n", sdt);
 		break;
 	default: /* not sure if this will be hit, because others are disabled */
-		hdcap->std = V4L2_STD_525_60;
+		hdcap->std = V4L2_STD_NTSC;
 		dev_info(hdcap->dev, "Non-PAL/NTSC detected (SDT=0x%02x)\n", sdt);
 		break;
 	}
 
-	hdcap->dv_timings_present = 0;
+	hdcap->detected_timings_present = 0;
 }
 
 /* Detect 240p/288p (non-interlaced) vs 480i/576i */
 static void usb3hdcap_detect_size(struct usb3hdcap *hdcap)
 {
 	int status;
-	int full_h = (hdcap->std & V4L2_STD_625_50) ? PAL_HEIGHT : NTSC_HEIGHT;
+	int full_h = (hdcap->std & V4L2_STD_PAL) ? PAL_HEIGHT : NTSC_HEIGHT;
 	int half_h = full_h / 2;
 	hdcap->width = SD_WIDTH;
 	hdcap->height = half_h;
@@ -158,7 +158,7 @@ int usb3hdcap_composite_init(struct usb3hdcap *hdcap)
 	usb3hdcap_detect_size(hdcap);
 
 	/* Adjust for PAL vs NTSC */
-	if (hdcap->std & V4L2_STD_625_50) {
+	if (hdcap->std & V4L2_STD_NTSC) {
 		u3hc_i2c_rmw(hdcap, ADDR_TW9900, TW9900_CROP_HI, 0x0f, 0x10);
 		u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_VDELAY_LO, 0x19);
 		u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_VACTIVE_LO, 0x20);

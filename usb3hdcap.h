@@ -162,6 +162,7 @@ struct usb3hdcap {
 	/* input selection + format */
 	enum usb3hdcap_input input;
 	v4l2_std_id std;
+	v4l2_std_id requested_std;
 	int width;
 	int height;
 	int interlaced;
@@ -183,7 +184,9 @@ struct usb3hdcap {
 	/* MST3367 state */
 	int mst_current_bank;
 	struct v4l2_dv_timings detected_timings;
-	int dv_timings_present;
+	int detected_timings_present;
+	struct v4l2_dv_timings requested_timings;
+	int requested_timings_present;
 
 	/* ALSA audio */
 	struct snd_card *snd;

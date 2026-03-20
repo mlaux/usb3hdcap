@@ -37,8 +37,9 @@
 #include <linux/usb.h>
 #include <linux/mutex.h>
 #include <media/v4l2-common.h>
-#include <media/v4l2-ioctl.h>
+#include <linux/v4l2-dv-timings.h>
 #include <media/v4l2-event.h>
+#include <media/v4l2-ioctl.h>
 #include <media/videobuf2-vmalloc.h>
 
 #include "usb3hdcap.h"
@@ -305,7 +306,9 @@ int usb3hdcap_hw_init(struct usb3hdcap *hdcap)
 {
 	/* Clear stale detection state from previous input */
 	hdcap->std = 0;
-	hdcap->dv_timings_present = 0;
+	hdcap->requested_std = 0;
+	hdcap->detected_timings_present = 0;
+	hdcap->requested_timings_present = 0;
 
 	usb3hdcap_device_init(hdcap);
 	usb3hdcap_cs53l21_init(hdcap);
@@ -342,8 +345,6 @@ static int usb3hdcap_querycap(struct file *file, void *priv,
 static int usb3hdcap_enum_input(struct file *file, void *priv,
 					struct v4l2_input *i)
 {
-	struct usb3hdcap *hdcap = video_drvdata(file);
-
 	if (i->index > INPUT_HDMI)
 		return -EINVAL;
 
@@ -351,12 +352,12 @@ static int usb3hdcap_enum_input(struct file *file, void *priv,
 	switch (i->index) {
 	case INPUT_COMPOSITE:
 		strscpy(i->name, "Composite", sizeof(i->name));
-		i->std = hdcap->video_dev.tvnorms;
+		i->std = USB3HDCAP_V4L2_STDS;
 		i->capabilities = V4L2_IN_CAP_STD;
 		break;
 	case INPUT_SVIDEO:
 		strscpy(i->name, "S-Video", sizeof(i->name));
-		i->std = hdcap->video_dev.tvnorms;
+		i->std = USB3HDCAP_V4L2_STDS;
 		i->capabilities = V4L2_IN_CAP_STD;
 		break;
 	case INPUT_COMPONENT:
@@ -404,10 +405,16 @@ static int usb3hdcap_g_std(struct file *file, void *priv, v4l2_std_id *norm)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	if (!hdcap->std)
+	if (!(hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO))
 		return -ENODATA;
 
-	*norm = hdcap->std;
+	/* try what was explicitly set, if unavailable, use detected */
+	if (hdcap->requested_std)
+		*norm = hdcap->requested_std;
+	else if (hdcap->std)
+		*norm = hdcap->std;
+	else
+		*norm = V4L2_STD_NTSC;
 	return 0;
 }
 
@@ -415,13 +422,17 @@ static int usb3hdcap_s_std(struct file *file, void *priv, v4l2_std_id norm)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	if (!hdcap->std)
+	if (!(hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)) {
+		dev_warn(hdcap->dev, "input set to %d\n", hdcap->input);
 		return -ENODATA;
+	}
 
-	if (!(norm & USB3HDCAP_V4L2_STDS))
+	if (!(norm & USB3HDCAP_V4L2_STDS)) {
+		dev_warn(hdcap->dev, "no match, requested %llu\n", norm);
 		return -EINVAL;
+	}
 
-	/* no-op, input source determines the standard */
+	hdcap->requested_std = norm;
 	return 0;
 }
 
@@ -444,6 +455,23 @@ static const struct v4l2_dv_timings_cap usb3hdcap_timings_cap = {
 	},
 };
 
+const struct v4l2_dv_timings all_supported_dv_timings[] = {
+	/* component only */
+	V4L2_DV_BT_CEA_720X480I59_94,
+	V4L2_DV_BT_CEA_720X576I50,
+	V4L2_DV_BT_CEA_1920X1080I60,
+
+	/* hdmi only */
+	V4L2_DV_BT_CEA_640X480P59_94,
+	V4L2_DV_BT_CEA_1280X720P50,
+
+	/* both */
+	V4L2_DV_BT_CEA_720X480P59_94,
+	V4L2_DV_BT_CEA_720X576P50,
+	V4L2_DV_BT_CEA_1280X720P60,
+	V4L2_DV_BT_CEA_1920X1080P60,
+};
+
 static int usb3hdcap_g_dv_timings(
 	struct file *file,
 	void *priv,
@@ -452,10 +480,17 @@ static int usb3hdcap_g_dv_timings(
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
 	/* composite/S-Video -> no DV timings */
-	if (!hdcap->dv_timings_present)
+	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
 		return -ENODATA;
 
-	*timings = hdcap->detected_timings;
+	/* nothing set with s_dv_timings and nothing detected? */
+	if (!(hdcap->requested_timings_present || hdcap->detected_timings_present))
+		return -ENODATA;
+
+	if (hdcap->requested_timings_present)
+		*timings = hdcap->requested_timings;
+	else
+		*timings = hdcap->detected_timings;
 	return 0;
 }
 
@@ -466,11 +501,11 @@ static int usb3hdcap_s_dv_timings(
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	if (!hdcap->dv_timings_present)
+	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
 		return -ENODATA;
 
-	/* Return the detected timing - we can't change it */
-	*timings = hdcap->detected_timings;
+	hdcap->requested_timings = *timings;
+	hdcap->requested_timings_present = 1;
 	return 0;
 }
 
@@ -481,14 +516,12 @@ static int usb3hdcap_enum_dv_timings(
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	if (timings->index > 0)
+	if (timings->index >= ARRAY_SIZE(all_supported_dv_timings))
 		return -EINVAL;
-	if (!hdcap->dv_timings_present)
+	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
 		return -ENODATA;
 
-	/* one entry: the current timings, because that's all that is supported
-	   until you unplug the cable */
-	timings->timings = hdcap->detected_timings;
+	timings->timings = all_supported_dv_timings[timings->index];
 	return 0;
 }
 
@@ -500,7 +533,7 @@ static int usb3hdcap_dv_timings_cap(
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
 	/* if you're not on HDMI/component, DV timings are not supported */
-	if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)
+	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
 		return -ENODATA;
 
 	*cap = usb3hdcap_timings_cap;
@@ -514,7 +547,7 @@ static int usb3hdcap_query_dv_timings(
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	if (!hdcap->dv_timings_present)
+	if (!hdcap->detected_timings_present)
 		return -ENODATA;
 
 	*timings = hdcap->detected_timings;
@@ -559,6 +592,11 @@ static int usb3hdcap_s_input(struct file *file, void *priv, unsigned int i)
 
 	hdcap->bpl = hdcap->width * 2;
 	hdcap->hw_inited = 1;
+
+	if (i == INPUT_COMPOSITE || i == INPUT_SVIDEO)
+		hdcap->video_dev.tvnorms = USB3HDCAP_V4L2_STDS;
+	else
+		hdcap->video_dev.tvnorms = 0;
 
 	usb3hdcap_activate_tw9900_ctrls(hdcap,
 		i == INPUT_COMPOSITE || i == INPUT_SVIDEO);
