@@ -144,6 +144,7 @@ struct usb3hdcap {
 	struct v4l2_ctrl *ctrl_saturation;
 	struct v4l2_ctrl *ctrl_hue;
 	struct v4l2_ctrl *ctrl_sharpness;
+	struct v4l2_ctrl *ctrl_rx_power;
 
 	struct mutex v4l2_lock;
 	struct mutex vb2q_lock;

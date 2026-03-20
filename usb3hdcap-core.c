@@ -737,9 +737,32 @@ static int usb3hdcap_s_ctrl(struct v4l2_ctrl *ctrl)
 	}
 }
 
+static int usb3hdcap_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
+{
+	switch (ctrl->id) {
+	case V4L2_CID_DV_RX_POWER_PRESENT:
+		ctrl->val = 1;
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
 static const struct v4l2_ctrl_ops usb3hdcap_ctrl_ops = {
 	.s_ctrl = usb3hdcap_s_ctrl,
+	.g_volatile_ctrl = usb3hdcap_g_volatile_ctrl,
 };
+
+static int usb3hdcap_subscribe_event(struct v4l2_fh *fh,
+				     const struct v4l2_event_subscription *sub)
+{
+	switch (sub->type) {
+	case V4L2_EVENT_SOURCE_CHANGE:
+		return v4l2_src_change_event_subscribe(fh, sub);
+	default:
+		return v4l2_ctrl_subscribe_event(fh, sub);
+	}
+}
 
 static const struct v4l2_ioctl_ops usb3hdcap_ioctl_ops = {
 	.vidioc_querycap = usb3hdcap_querycap,
@@ -772,7 +795,7 @@ static const struct v4l2_ioctl_ops usb3hdcap_ioctl_ops = {
 	.vidioc_streamon = vb2_ioctl_streamon,
 	.vidioc_streamoff = vb2_ioctl_streamoff,
 
-	.vidioc_subscribe_event = v4l2_ctrl_subscribe_event,
+	.vidioc_subscribe_event = usb3hdcap_subscribe_event,
 	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
 };
 
@@ -819,7 +842,7 @@ static int video_init(struct usb3hdcap *hdcap)
 		return ret;
 	}
 
-	v4l2_ctrl_handler_init(&hdcap->ctrl, 5);
+	v4l2_ctrl_handler_init(&hdcap->ctrl, 6);
 	hdcap->ctrl_brightness = v4l2_ctrl_new_std(&hdcap->ctrl,
 		&usb3hdcap_ctrl_ops, V4L2_CID_BRIGHTNESS, -128, 127, 1, -9);
 	hdcap->ctrl_contrast = v4l2_ctrl_new_std(&hdcap->ctrl,
@@ -830,6 +853,11 @@ static int video_init(struct usb3hdcap *hdcap)
 		&usb3hdcap_ctrl_ops, V4L2_CID_HUE, -128, 127, 1, 0);
 	hdcap->ctrl_sharpness = v4l2_ctrl_new_std(&hdcap->ctrl,
 		&usb3hdcap_ctrl_ops, V4L2_CID_SHARPNESS, 0, 255, 1, 0x52);
+	hdcap->ctrl_rx_power = v4l2_ctrl_new_std(&hdcap->ctrl,
+		&usb3hdcap_ctrl_ops, V4L2_CID_DV_RX_POWER_PRESENT, 0, 1, 0, 1);
+	if (hdcap->ctrl_rx_power)
+		hdcap->ctrl_rx_power->flags |= V4L2_CTRL_FLAG_VOLATILE |
+						V4L2_CTRL_FLAG_READ_ONLY;
 	ret = hdcap->ctrl.error;
 	if (ret < 0) {
 		dev_warn(hdcap->dev, "Could not initialize controls\n");
