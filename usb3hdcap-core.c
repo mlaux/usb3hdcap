@@ -721,14 +721,14 @@ static int usb3hdcap_log_status(struct file *file, void *priv)
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
 	dev_info(hdcap->dev,
-		"status: iso_cbs=%u iso_bytes=%lu markers=%u frames=%u " \
-		"parse_len=%d frame_line=%d synced=%d was_blanking=%d "  \
-		"cur_buf=%p\n",
+		"status: iso_cbs=%u iso_bytes=%lu markers=%u frames=%u ",
 		hdcap->iso_cb_count, hdcap->iso_bytes,
-		hdcap->markers_found, hdcap->frames_delivered,
+		hdcap->markers_found, hdcap->frames_delivered);
+	dev_info(hdcap->dev,
+		"parse_len=%d frame_line=%d synced=%d was_blanking=%d ",
 		hdcap->parse_len, hdcap->frame_line,
-		hdcap->synced, hdcap->was_blanking,
-		hdcap->cur_buf);
+		hdcap->synced, hdcap->was_blanking);
+	dev_info(hdcap->dev, "cur_buf=%p\n", hdcap->cur_buf);
 	return 0;
 }
 
