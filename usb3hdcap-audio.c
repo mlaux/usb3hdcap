@@ -144,6 +144,7 @@ void usb3hdcap_audio_data(struct usb3hdcap *hdcap, const u8 *data, int len)
 	/* Copy into ALSA ring buffer, handling wrap */
 	if (buffer_pos + nframes >= runtime->buffer_size) {
 		size_t cnt = (runtime->buffer_size - buffer_pos) * frame_bytes;
+
 		memcpy(runtime->dma_area + buffer_pos * frame_bytes,
 			data, cnt);
 		memcpy(runtime->dma_area, data + cnt,

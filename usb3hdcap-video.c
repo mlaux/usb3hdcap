@@ -60,6 +60,7 @@ static void deliver_frame(struct usb3hdcap *hdcap)
 	vaddr = vb2_plane_vaddr(&buf->vb.vb2_buf, 0);
 	while (hdcap->frame_line < hdcap->height) {
 		u8 *row = vaddr + hdcap->frame_line * hdcap->bpl;
+
 		for (k = 0; k < hdcap->bpl; k += 4) {
 			row[k + 0] = 0x10;
 			row[k + 1] = 0x80;
@@ -95,7 +96,6 @@ static void process_video_line(struct usb3hdcap *hdcap, const u8 *video)
 {
 	u8 sav_xy = video[0];
 	int blanking = sav_xy & BT656_V_BIT;
-	int field = sav_xy & BT656_F_BIT;
 
 	/* Blanking -> active transition */
 	if (!blanking && hdcap->was_blanking) {
@@ -144,8 +144,10 @@ static void process_data(struct usb3hdcap *hdcap)
 			/* SAV: video line */
 			if (pos + line_size > hdcap->parse_len)
 				break;
-			/* -1 because on this hardware, XY byte occupies the first pixel's
-			   V position */
+			/* 
+			 * -1 because on this hardware, XY byte occupies the first pixel's
+			 * V position
+			 */
 			process_video_line(hdcap, buf + pos + SAV_LEN - 1);
 			pos += line_size;
 		} else if (buf[pos + 2] == 0xff) {
@@ -268,6 +270,7 @@ static void usb3hdcap_stop(struct usb3hdcap *hdcap)
 
 	for (k = 0; k < NUM_XFERS; k++) {
 		struct urb *urb = hdcap->isoc_urbs[k];
+
 		if (!urb)
 			continue;
 		usb_kill_urb(urb);
@@ -328,16 +331,18 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 	hdcap->cur_buf = NULL;
 
 	if (hdcap->input == INPUT_HDMI) {
-		/* this is a register watchlist, interrupt generated n endpoint 1 when
-		   (value & mask) changes */
-		/*
-			struct reg_watch {
-				uint8_t reg;
-				uint8_t bank_or_source; // 0x80-0x82: MST3367 bank n&0x7f, 0x40: look at I2C addr
-				uint8_t value_mask;
-				uint8_t i2c_addr; // for bank_or_source == 0x40
-			};
-		*/
+		/* 
+		 * this is a register watchlist, interrupt generated n endpoint 1 when
+		 * (value & mask) changes.
+		 * 
+		 * struct reg_watch {
+		 *   uint8_t reg;
+		 *   // 0x80-0x82: MST3367 bank n&0x7f, 0x40: look at I2C addr
+		 *   uint8_t bank_or_source;
+		 *   uint8_t value_mask;
+		 *   uint8_t i2c_addr; // for bank_or_source == 0x40
+		 * };
+		 */
 		u8 stream_payload[] = {
 			0x55, 0x80, 0x3c, 0x00,  0x6a, 0x80, 0x0f, 0x00,
 			0x6b, 0x80, 0xfe, 0x00,  0x57, 0x80, 0x3f, 0x00,
@@ -380,15 +385,18 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 		return ret;
 	}
 
-	/* Select alt setting based on bandwidth:
+	/* 
+	 * Select alt setting based on bandwidth:
 	 * alt 1: maxp=1024 burst=16 mult=1 -> 16KB/pkt (SD)
-	 * alt 2: maxp=1024 burst=16 mult=2 -> 32KB/pkt (HD) */
+	 * alt 2: maxp=1024 burst=16 mult=2 -> 32KB/pkt (HD) 
+	 */
 	alt = (hdcap->width > 720 || hdcap->height > 576) ? 2 : 1;
-	dev_info(hdcap->dev, "usb3hdcap_start: setting alt %d\n", alt);
+	dev_info(hdcap->dev, "%s: setting alt %d\n", __func__, alt);
 	ret = usb_set_interface(hdcap->usb_dev, 0, alt);
 
 	if (ret < 0) {
-		dev_err(hdcap->dev, "usb3hdcap_start: usb_set_interface failed: %d\n", ret);
+		dev_err(hdcap->dev, "%s: usb_set_interface failed: %d\n", 
+			__func__, ret);
 		vfree(hdcap->parse_buf);
 		hdcap->parse_buf = NULL;
 		return ret;
@@ -410,6 +418,7 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 
 	for (k = 0; k < NUM_XFERS; k++) {
 		struct urb *urb = usb3hdcap_alloc_urb(hdcap);
+
 		if (!urb) {
 			ret = -ENOMEM;
 			goto fail;
@@ -437,10 +446,9 @@ static int usb3hdcap_queue_setup(
 	unsigned int *nbuffers,
 	unsigned int *nplanes,
 	unsigned int sizes[],
-	struct device *alloc_devs[]
-) {
+	struct device *alloc_devs[])
+{
 	struct usb3hdcap *hdcap = vb2_get_drv_priv(vq);
-	unsigned int q_num_bufs = vb2_get_num_buffers(vq);
 	unsigned int img_size = hdcap->bpl * hdcap->height;
 
 	if (*nplanes) {
@@ -500,7 +508,7 @@ const struct vb2_ops usb3hdcap_vb2_ops = {
 	.buf_queue = usb3hdcap_buf_queue,
 	.start_streaming = usb3hdcap_start_streaming,
 	.stop_streaming = usb3hdcap_stop_streaming,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
+#if KERNEL_VERSION(6, 13, 0) >= LINUX_VERSION_CODE
 	.wait_prepare = vb2_ops_wait_prepare,
 	.wait_finish = vb2_ops_wait_finish,
 #endif

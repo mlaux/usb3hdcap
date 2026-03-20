@@ -5,11 +5,11 @@
 #include <linux/usb.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ctrls.h>
+#include <media/videobuf2-core.h>
 #include <media/videobuf2-v4l2.h>
 
 struct snd_card;
 struct snd_pcm_substream;
-struct vb2_ops;
 
 #define USB3HDCAP_V4L2_STDS (V4L2_STD_NTSC | V4L2_STD_PAL)
 
@@ -110,7 +110,7 @@ enum usb3hdcap_input {
 #define NUM_XFERS    8
 #define NUM_ISO_PKTS 64
 
-/* 
+/*
  * Stream framing: two element types in the byte stream, both
  * starting with ff 00:
  *   SAV (ff 00 00 XY): bpl-1 pixel bytes, -1 because the XY is actually

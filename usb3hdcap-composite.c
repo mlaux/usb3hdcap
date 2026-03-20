@@ -21,9 +21,8 @@ static void usb3hdcap_detect_std(struct usb3hdcap *hdcap)
 
 	for (k = 0; k < 10; k++) {
 		sdt = u3hc_i2c_read(hdcap, ADDR_TW9900, TW9900_SDT);
-		if (!(sdt & 0x80)) {
+		if (!(sdt & 0x80))
 			break;
-		}
 		msleep(100);
 	}
 
@@ -58,6 +57,7 @@ static void usb3hdcap_detect_size(struct usb3hdcap *hdcap)
 	int status;
 	int full_h = (hdcap->std & V4L2_STD_PAL) ? PAL_HEIGHT : NTSC_HEIGHT;
 	int half_h = full_h / 2;
+
 	hdcap->width = SD_WIDTH;
 	hdcap->height = half_h;
 
@@ -88,9 +88,8 @@ int usb3hdcap_composite_init(struct usb3hdcap *hdcap)
 	/* select TW9900 input of cpld? */
 	/* from windows driver */
 	status = u3hc_i2c_read(hdcap, ADDR_CPLD, 0x3b);
-	if (status != 0) {
+	if (status != 0)
 		u3hc_i2c_write(hdcap, ADDR_CPLD, 0x3b, 0x80);
-	}
 	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
 	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x00, 0x01);
 	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x10, 0xfe);
@@ -139,8 +138,10 @@ int usb3hdcap_composite_init(struct usb3hdcap *hdcap)
 	for (k = 0; k < 10; k++) {
 		status = u3hc_i2c_read(hdcap, ADDR_TW9900, TW9900_CSTATUS);
 
-		/* 0x40 = "Horizontal sync PLL is locked to the incoming video source"
-		   0x08 = "Vertical logic is locked to the incoming video source" */
+		/* 
+		 * 0x40 = "Horizontal sync PLL is locked to the incoming video source"
+		 * 0x08 = "Vertical logic is locked to the incoming video source"
+		 */
 		if (status >= 0 && (status & 0x48) == 0x48) {
 			dev_info(hdcap->dev, "Signal locked (%d ms)\n", k * 100);
 			break;

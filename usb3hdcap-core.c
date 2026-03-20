@@ -2,25 +2,25 @@
 /*
  * StarTech USB3HDCAP USB 3.0 HD Video Capture Driver
  * a.k.a. YUAN High-Tech Development Co., Ltd UB530
- * 
+ *
  * Supported inputs are composite, S-Video, component, and HDMI. I haven't
  * attempted to support DVI or VGA.
- * 
+ *
  * Tested video modes (all at 60fps):
  *     composite 240p and 480i
  *     S-Video 240p and 480i
  *     component 240p, 480i, 480p, 720p, 1080i
  *     HDMI 1080p
- * 
+ *
  * Other video modes will probably "just work" if the appropriate entries
  * are added in the mode tables and code is added to disambiguate using
  * htotal if necessary.
- * 
+ *
  * Audio is supported and should work with all inputs.
  *
  * Also partially supports the Micomsoft XCAPTURE-1 for composite and
  * S-Video only... HDMI is unusable, component is untested.
- * 
+ *
  * Based on USBPcap analysis and reverse engineering of CY3014.X64.SYS
  *   (version 1.1.0.193 of Fri, 04 Jun 2021 09:37:45 UTC)
  * MST3367 HDMI path based on hdcapm
@@ -78,9 +78,8 @@ int vendor_out(
 	kfree(buf);
 
 	if (ret < 0) {
-		dev_err(hdcap->dev,
-			"vendor_out 0x%02x val=0x%04x idx=0x%04x: %d\n",
-			request, value, index, ret);
+		dev_err(hdcap->dev, "%s 0x%02x val=0x%04x idx=0x%04x: %d\n",
+			__func__, request, value, index, ret);
 		return ret;
 	}
 
@@ -163,8 +162,8 @@ static int mcu_i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg)
 	/* Retrieve the result */
 	ret = vendor_in(hdcap, REQ_I2C, 0x5066, 0, &val, 1);
 	if (ret < 0) {
-		dev_err(hdcap->dev, "mcu_i2c_read 0x%02x reg 0x%02x: %d\n",
-			addr, reg, ret);
+		dev_err(hdcap->dev, "%s 0x%02x reg 0x%02x: %d\n",
+			__func__, addr, reg, ret);
 		return ret;
 	}
 
@@ -188,8 +187,8 @@ int u3hc_i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg)
 
 	ret = vendor_in(hdcap, REQ_I2C, addr, reg, &val, 1);
 	if (ret < 0) {
-		dev_err(hdcap->dev, "i2c_read 0x%02x reg 0x%02x: %d\n",
-			addr, reg, ret);
+		dev_err(hdcap->dev, "%s 0x%02x reg 0x%02x: %d\n",
+			__func__, addr, reg, ret);
 		return ret;
 	}
 
@@ -229,14 +228,14 @@ static void usb3hdcap_probe_mcu(struct usb3hdcap *hdcap)
 	vendor_out(hdcap, REQ_GPIO, 0x4134, 0, NULL, 0);
 
 	/* Poll GPIO 0x39 until MCU signals ready */
-	for (k = 0; k < 100; k++) {
-		msleep(10);
+	for (k = 0; k < 50; k++) {
+		msleep(20);
 		ret = vendor_in(hdcap, REQ_GPIO, 0x39, 0, rx, 1);
 		if (ret >= 0 && rx[0] == 1)
 			break;
 	}
 
-	if (k == 100) {
+	if (k == 50) {
 		dev_info(hdcap->dev, "MCU not detected (GPIO timeout)\n");
 		return;
 	}
@@ -274,16 +273,16 @@ static int usb3hdcap_device_init(struct usb3hdcap *hdcap)
 	vendor_out(hdcap, REQ_STREAM, 0x0000, 0, NULL, 0);
 
 	/*
-		just replay what the windows driver does:
-			FUN_14022e3f4(param_1,0x402d);
-			FUN_14022e3f4(param_1,0x12d);
-			FUN_140001220(0x32);
-			FUN_14022e3f4(param_1,0x2d);
-			FUN_140001220(0x32);
-			FUN_14022e3f4(param_1,0x12d);
-			FUN_140001220(0x32);
-			FUN_14022e3f4(param_1,0x802d);
-	*/
+	 * just replay what the windows driver does:
+	 *	FUN_14022e3f4(param_1,0x402d);
+	 *	FUN_14022e3f4(param_1,0x12d);
+	 *	FUN_140001220(0x32);
+	 *	FUN_14022e3f4(param_1,0x2d);
+	 *	FUN_140001220(0x32);
+	 *	FUN_14022e3f4(param_1,0x12d);
+	 *	FUN_140001220(0x32);
+	 *	FUN_14022e3f4(param_1,0x802d);
+	 */
 
 	vendor_out(hdcap, REQ_GPIO, 0x402d, 0, NULL, 0);
 	vendor_out(hdcap, REQ_GPIO, 0x012d, 0, NULL, 0);
@@ -393,10 +392,13 @@ static int usb3hdcap_fmt_vid_cap(struct file *file, void *priv,
 	int height = hdcap->height;
 	int interlaced = hdcap->interlaced;
 
-	/* If timings were explicitly set, report format matching those
-	 * timings instead of what was detected from the signal */
+	/* 
+	 * If timings were explicitly set, report format matching those
+	 * timings instead of what was detected from the signal
+	 */
 	if (hdcap->requested_timings_present) {
 		const struct v4l2_bt_timings *bt = &hdcap->requested_timings.bt;
+
 		width = bt->width;
 		height = bt->interlaced ? bt->height / 2 : bt->height;
 		interlaced = bt->interlaced;
@@ -639,8 +641,10 @@ static void fill_timeperframe(
 	struct usb3hdcap *hdcap,
 	struct v4l2_fract *tf)
 {
-	/* using the frame rate here even for interlaced, spec isn't super
-	   clear on what to do, but adv7180.c does it this way */
+	/* 
+	 * using the frame rate here even for interlaced, spec isn't super
+	 * clear on what to do, but adv7180.c does it this way
+	 */
 	if (hdcap->detected_timings.type) {
 		const struct v4l2_bt_timings *bt = &hdcap->detected_timings.bt;
 		u32 htotal = V4L2_DV_BT_FRAME_WIDTH(bt);
@@ -717,8 +721,8 @@ static int usb3hdcap_log_status(struct file *file, void *priv)
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
 	dev_info(hdcap->dev,
-		"status: iso_cbs=%u iso_bytes=%lu markers=%u frames=%u "
-		"parse_len=%d frame_line=%d synced=%d was_blanking=%d "
+		"status: iso_cbs=%u iso_bytes=%lu markers=%u frames=%u " \
+		"parse_len=%d frame_line=%d synced=%d was_blanking=%d "  \
 		"cur_buf=%p\n",
 		hdcap->iso_cb_count, hdcap->iso_bytes,
 		hdcap->markers_found, hdcap->frames_delivered,
@@ -903,8 +907,8 @@ static int video_init(struct usb3hdcap *hdcap)
 		goto vdev_fail;
 	}
 
-	dev_info(hdcap->dev, "video_init: registered as %s\n",
-		video_device_node_name(&hdcap->video_dev));
+	dev_info(hdcap->dev, "%s: registered as %s\n",
+		__func__, video_device_node_name(&hdcap->video_dev));
 
 	return 0;
 
@@ -935,6 +939,7 @@ static int usb3hdcap_probe(struct usb_interface *intf,
 
 	dev = &intf->dev;
 
+	/* hdcap = kzalloc_obj(*hdcap, GFP_KERNEL); */
 	hdcap = kzalloc(sizeof(struct usb3hdcap), GFP_KERNEL);
 	if (hdcap == NULL)
 		return -ENOMEM;
@@ -957,9 +962,11 @@ static int usb3hdcap_probe(struct usb_interface *intf,
 	if (ret < 0)
 		dev_warn(dev, "audio init failed: %d (continuing without audio)\n", ret);
 
-	/* Take an extra ref so that disconnect's v4l2_device_put doesn't
+	/* 
+	 * Take an extra ref so that disconnect's v4l2_device_put doesn't
 	 * immediately trigger usb3hdcap_release before cleanup is done - based on
-	 * usbtv driver */
+	 * usbtv driver
+	 */
 	v4l2_device_get(&hdcap->v4l2_dev);
 
 	dev_info(dev, "%s USB 3.0 HD Video Capture Device",

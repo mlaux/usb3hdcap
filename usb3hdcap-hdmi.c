@@ -31,32 +31,32 @@ struct component_mode {
 /*
  * Values from Windows driver table $140303810
  * TODO: add 50Hz variants
- * 
+ *
  * The hardware supports 240p over component (one of the great things about
  * this card), but the Windows driver doesn't attempt to distinguish. I
  * won't either
  */
 static const struct component_mode component_modes[] = {
 	/* 480i */
-	{  250,  275,   720,  240, 60, 1, 0x08,0x08,0x08,0x18, 0x44,0x04, 0x35a, 0x76, 0x12,
+	{  250,  275,   720,  240, 60, 1, 0x08, 0x08, 0x08, 0x18, 0x44, 0x04, 0x35a, 0x76, 0x12,
 	   V4L2_DV_BT_CEA_720X480I59_94 },
 	/* 576i */
-	{  300,  320,   720,  288, 50, 1, 0x08,0x08,0x08,0x18, 0x44,0x04, 0x360, 0x83, 0x16,
+	{  300,  320,   720,  288, 50, 1, 0x08, 0x08, 0x08, 0x18, 0x44, 0x04, 0x360, 0x83, 0x16,
 	   V4L2_DV_BT_CEA_720X576I50 },
 	/* 480p */
-	{  515,  535,   720,  480, 60, 0, 0x20,0x08,0x08,0x18, 0x33,0x03, 0x35a, 0x79, 0x24,
+	{  515,  535,   720,  480, 60, 0, 0x20, 0x08, 0x08, 0x18, 0x33, 0x03, 0x35a, 0x79, 0x24,
 	   V4L2_DV_BT_CEA_720X480P59_94 },
 	/* 1080i */
-	{  555,  585,  1920,  540, 60, 1, 0x58,0x38,0x20,0x30, 0x11,0x01, 0x898, 0xeb, 0x14,
+	{  555,  585,  1920,  540, 60, 1, 0x58, 0x38, 0x20, 0x30, 0x11, 0x01, 0x898, 0xeb, 0x14,
 	   V4L2_DV_BT_CEA_1920X1080I60 },
 	/* 576p */
-	{  615,  635,   720,  576, 50, 0, 0x18,0x08,0x08,0x18, 0x33,0x03, 0x360, 0x83, 0x2c,
+	{  615,  635,   720,  576, 50, 0, 0x18, 0x08, 0x08, 0x18, 0x33, 0x03, 0x360, 0x83, 0x2c,
 	   V4L2_DV_BT_CEA_720X576P50 },
 	/* 720p */
-	{  740,  760,  1280,  720, 60, 0, 0x58,0x38,0x20,0x30, 0x11,0x01, 0x672,0x12b, 0x19,
+	{  740,  760,  1280,  720, 60, 0, 0x58, 0x38, 0x20, 0x30, 0x11, 0x01, 0x672,0x12b, 0x19,
 	   V4L2_DV_BT_CEA_1280X720P60 },
 	/* 1080p */
-	{ 1115, 1135,  1920, 1080, 60, 0, 0xe8,0x38,0x30,0xa0, 0x00,0x00, 0x898, 0xc1, 0x29,
+	{ 1115, 1135,  1920, 1080, 60, 0, 0xe8, 0x38, 0x30, 0xa0, 0x00, 0x00, 0x898, 0xc1, 0x29,
 	   V4L2_DV_BT_CEA_1920X1080P60 },
 };
 
@@ -79,8 +79,10 @@ static const struct hdmi_std hdmi_stds[] = {
 	{  854,  874,  620,  630,  720, V4L2_DV_BT_CEA_720X576P50 },
 	{ 2960, 2980,  745,  755, 1280, V4L2_DV_BT_CEA_1280X720P50 },
 	{ 2465, 2485,  745,  755, 1280, V4L2_DV_BT_CEA_1280X720P60 },
-	/* not sure about this one. it matches the timings for 30, but my laptop
-	   claims to be outputting 60... */
+	/*
+	 * not sure about this one. it matches the timings for 30, but my laptop
+	 * claims to be outputting 60... 
+	 */
 	{ 2740, 2760, 1120, 1130, 1920, V4L2_DV_BT_CEA_1920X1080P30 },
 	{ 3950, 3970, 1120, 1130, 1920, V4L2_DV_BT_CEA_1920X1080P50 },
 	{ 2190, 2210, 1120, 1130, 1920, V4L2_DV_BT_CEA_1920X1080P60 },
@@ -196,21 +198,23 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xcf, 0xfa, 0x02); /* clear bits 0,2; set bit 1 */
 
 	/*
-		8c28 is "CustomCompanyEndoCamProperty" (0 in my registry)
-		7674 is "CustomAnalogVideoInputBandwidthProperty" (1 on my machine)
-	    if (*(int *)(param_1 + 0x8c28) == 0) {
-			uVar1 = *(uint *)(param_1 + 0x7674);
-			local_18 = 0x3040006;
-			uVar2 = (ulonglong)uVar1 / 6;
-			local_14 = 0x107;
-			bVar5 = read_mst(param_1,CONCAT71((int7)(uVar2 >> 8),0x80),0xd0);
-			bVar4 = read_mst(param_1,0x80,0xcf);
-			bVar3 = *(byte *)((longlong)&local_18 + (ulonglong)(uVar1 + (int)uVar2 * -6));
-			bVar4 = bVar3 << 7 | bVar4 & 0x7f;
-			bVar5 = (bVar3 >> 1 ^ bVar5) & 3 ^ bVar5;
-	    }
-		... which has this effect:
-	*/
+	 * 8c28 is "CustomCompanyEndoCamProperty" (0 in my registry)
+	 * 7674 is "CustomAnalogVideoInputBandwidthProperty" (1 on my machine)
+	 * if (*(int *)(param_1 + 0x8c28) == 0) {
+	 *   uVar1 = *(uint *)(param_1 + 0x7674);
+	 *   local_18 = 0x3040006;
+	 *   uVar2 = (ulonglong)uVar1 / 6;
+	 *   local_14 = 0x107;
+	 *   bVar5 = read_mst(param_1,CONCAT71((int7)(uVar2 >> 8),0x80),0xd0);
+	 *   bVar4 = read_mst(param_1,0x80,0xcf);
+	 *   bVar3 = *(byte *)((longlong)&local_18 + (ulonglong)(uVar1 
+	 *                 + (int)uVar2 * -6));
+	 *   bVar4 = bVar3 << 7 | bVar4 & 0x7f;
+	 *   bVar5 = (bVar3 >> 1 ^ bVar5) & 3 ^ bVar5;
+	 * }
+	 *
+	 * ... which has this effect:
+	 */
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xd0, 0xfc, 0x00);
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xcf, 0x7f, 0x00);
 
@@ -227,32 +231,32 @@ static void cpld_init(struct usb3hdcap *hdcap, u8 mux_val)
 	int k, status;
 
 	/*
-	  	cVar3 = i2c_read(param_1,0x98,0x3b,0);
-		if (cVar3 != '\0') {
-			uVar5 = *(uint *)(param_1 + 0x6840);
-			if ((uVar5 == 2) || (uVar5 == 3)) {
-				local_res8[0] = -0x80;
-				i2c_write(param_1,0x98,0x3b,local_res8,1);
-				uVar5 = *(uint *)(param_1 + 0x6840);
-			}
-			if (uVar5 < 2) {
-				local_res8[0] = '\x02';
-				i2c_write(param_1,0x98,0x3b,local_res8,1);
-			}
-		}
-	*/
+	 * cVar3 = i2c_read(param_1,0x98,0x3b,0);
+	 * if (cVar3 != '\0') {
+	 *   uVar5 = *(uint *)(param_1 + 0x6840);
+	 *   if ((uVar5 == 2) || (uVar5 == 3)) {
+	 *     local_res8[0] = -0x80;
+	 *     i2c_write(param_1,0x98,0x3b,local_res8,1);
+	 *     uVar5 = *(uint *)(param_1 + 0x6840);
+	 *   }
+	 *   if (uVar5 < 2) {
+	 *     local_res8[0] = '\x02';
+	 *     i2c_write(param_1,0x98,0x3b,local_res8,1);
+	 *   }
+	 * }
+	 */
 
 	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x3b, mux_val);
 
 	/*
-		local_res8[0] = '\x05';
-		i2c_write(param_1,0x98,0x20,local_res8,1);
-		cVar3 = FUN_140226fc4(param_1);
-		local_res8[0] = '\x01';
-		i2c_write(param_1,0x98,0,local_res8,1);
-		local_res8[0] = (-(cVar3 != '\0') & 0xfeU) - 2;
-		i2c_write(param_1,0x98,0x10,local_res8,1);
-	*/
+	 * local_res8[0] = '\x05';
+	 * i2c_write(param_1,0x98,0x20,local_res8,1);
+	 * cVar3 = FUN_140226fc4(param_1);
+	 * local_res8[0] = '\x01';
+	 * i2c_write(param_1,0x98,0,local_res8,1);
+	 * local_res8[0] = (-(cVar3 != '\0') & 0xfeU) - 2;
+	 * i2c_write(param_1,0x98,0x10,local_res8,1);
+	 */
 	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
 	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x00, 0x01);
 
@@ -282,22 +286,21 @@ static void mst3367_identity_csc(struct usb3hdcap *hdcap)
 	mst_bank(hdcap, 0x00);
 
 	/*
-		bVar3 = read_mst(param_1,0,0xab);
-		send_mst(param_1,0,0xab,bVar3 & 0x7f | 0x80);
-  	*/
+	 * bVar3 = read_mst(param_1,0,0xab);
+	 * send_mst(param_1,0,0xab,bVar3 & 0x7f | 0x80);
+  	 */
 	u3hc_i2c_rmw_get_old(hdcap, ADDR_MST3367, 0xab, 0x7f, 0x80, &old_ab);
 
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x90, 0x15);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x91, 0x15);
 	/*
-	  	iVar1 = *(int *)(lVar2 + 0x60);
-		if (*(int *)(lVar2 + 0x5c) == 1) {
-			cVar5 = (-(iVar1 != 0) & 0x11U) + 0x55;
-		}
-		else {
-			cVar5 = (-(iVar1 != 0) & 0x22U) + 0x40;
-		}
-		send_mst(param_1,0,0x92,cVar5);
+	 * iVar1 = *(int *)(lVar2 + 0x60);
+	 * if (*(int *)(lVar2 + 0x5c) == 1) {
+	 *   cVar5 = (-(iVar1 != 0) & 0x11U) + 0x55;
+	 * } else {
+	 *   cVar5 = (-(iVar1 != 0) & 0x22U) + 0x40;
+	 * }
+	 * send_mst(param_1,0,0x92,cVar5);
 	*/
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x92, comp ? 0x66 : 0x62);
 
@@ -333,16 +336,16 @@ static void mst3367_identity_csc(struct usb3hdcap *hdcap)
 	/* end from FUN_140249474 */
 
 	/*
-		bVar4 = read_mst(param_1,0,0xb0);
-		send_mst(param_1,0,0xb0,bVar4 & 0xc2 | 0x21);
-		send_mst(param_1,0,0xab,bVar3 & 0x7f);
+	 * bVar4 = read_mst(param_1,0,0xb0);
+	 * send_mst(param_1,0,0xb0,bVar4 & 0xc2 | 0x21);
+	 * send_mst(param_1,0,0xab,bVar3 & 0x7f);
   	*/
-	/* 
-		from hdcapm driver:
-		0x25 = RX_OUTPUT_YUV422 / 10.BITS / EXTERNAL SYNC,
-		0x21 = RX_OUTPUT_YUV422 / 08.BITS / EMBEDDED SYNC,
-		0x24 = RX_OUTPUT_YUV422 / 10.BITS / EXTERNAL SYNC,
-		0x20 = RX_OUTPUT_YUV422 / 08.BITS / EXTERNAL SYNC
+	/*
+	 * from hdcapm driver:
+	 * 0x25 = RX_OUTPUT_YUV422 / 10.BITS / EXTERNAL SYNC,
+	 * 0x21 = RX_OUTPUT_YUV422 / 08.BITS / EMBEDDED SYNC,
+	 * 0x24 = RX_OUTPUT_YUV422 / 10.BITS / EXTERNAL SYNC,
+	 * 0x20 = RX_OUTPUT_YUV422 / 08.BITS / EXTERNAL SYNC
 	*/
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xb0, 0xc2, 0x21);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xab, old_ab & 0x7f);
@@ -460,8 +463,10 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 
 static void mst3367_adc_config(struct usb3hdcap *hdcap)
 {
-	/* not sure what any of these do other than only being used in the 
-	   analog path */
+	/*
+	 * not sure what any of these do other than only being used in the
+	 * analog path
+	 */
 	mst_bank(hdcap, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x00, 0x80);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x24, 0xc0);
@@ -498,27 +503,25 @@ static void component_write_scaler(
 	const struct component_mode *m)
 {
 	int ht = m->scaler_htotal - 1;
-	int is_720_low_rr = m->width == 1280 && m->height == 720 
-			&& (m->refresh_rate == 24 
-				|| m->refresh_rate == 25 
+	int is_720_low_rr = m->width == 1280 && m->height == 720
+			&& (m->refresh_rate == 24
+				|| m->refresh_rate == 25
 				|| m->refresh_rate == 30);
 
 	mst_bank(hdcap, 0x00);
 
-	/* edge case from windows driver */
 	/*
-		if (((*(int *)(uVar30 + 0x30) == 0x500) && (*(int *)(uVar30 + 0x34) == 0x2d0)) &&
-           ((*(int *)(uVar30 + 0x38) == 0x1e ||
-            ((*(int *)(uVar30 + 0x38) == 0x19 || (*(int *)(uVar30 + 0x38) == 0x18)))))) {
-          uVar37 = 0;
-        }
-        else {
-          uVar37 = 4;
-        }
-        send_mst(param_1,0,0x12,uVar37);
-	*/
+	 * edge case for low frame rate 720p:
+	 * if (((*(int *)(uVar30 + 0x30) == 0x500) && (*(int *)(uVar30 + 0x34) == 0x2d0)) &&
+     *     ((*(int *)(uVar30 + 0x38) == 0x1e ||
+     *     ((*(int *)(uVar30 + 0x38) == 0x19 || (*(int *)(uVar30 + 0x38) == 0x18)))))) {
+     *   uVar37 = 0;
+     * } else {
+     *   uVar37 = 4;
+     * }
+     * send_mst(param_1,0,0x12,uVar37);
+	 */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x12, is_720_low_rr ? 0x00 : 0x04);
-
 
 	/* filter/gain */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x03, m->reg_03);
@@ -752,8 +755,10 @@ int usb3hdcap_component_init(struct usb3hdcap *hdcap)
 
 	mst3367_adc_config(hdcap);
 
-	/* Wait for ADC to stabilize, windows driver does this but might be able
-	   to decrease wait */
+	/* 
+	 * Wait for ADC to stabilize, windows driver does this but might be able
+	 * to decrease wait
+	 */
 	msleep(1000);
 
 	/* Final CPLD verify */
