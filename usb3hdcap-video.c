@@ -4,6 +4,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/usb.h>
 #include <linux/vmalloc.h>
@@ -502,6 +503,8 @@ const struct vb2_ops usb3hdcap_vb2_ops = {
 	.buf_queue = usb3hdcap_buf_queue,
 	.start_streaming = usb3hdcap_start_streaming,
 	.stop_streaming = usb3hdcap_stop_streaming,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
 	.wait_prepare = vb2_ops_wait_prepare,
 	.wait_finish = vb2_ops_wait_finish,
+#endif
 };
