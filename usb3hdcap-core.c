@@ -48,6 +48,15 @@
 #define USB3HDCAP_PID 0xf533
 #define XCAPTURE1_PID 0xf531
 
+#define V4L2_CID_USB3HDCAP_CSC (V4L2_CID_USER_BASE | 0x1000)
+
+static const char * const csc_menu[] = {
+	"Default (Component)",
+	"Default (HDMI)",
+	"YCbCr (HDMI)",
+	NULL,
+};
+
 /* ------------------------------------------------------------------ */
 /* USB control transfer helpers                                       */
 /* ------------------------------------------------------------------ */
@@ -565,13 +574,19 @@ static int usb3hdcap_query_dv_timings(
 	return 0;
 }
 
-static void usb3hdcap_activate_tw9900_ctrls(struct usb3hdcap *hdcap, bool active)
+static void usb3hdcap_activate_ctrls(struct usb3hdcap *hdcap,
+	enum usb3hdcap_input input)
 {
-	v4l2_ctrl_activate(hdcap->ctrl_brightness, active);
-	v4l2_ctrl_activate(hdcap->ctrl_contrast, active);
-	v4l2_ctrl_activate(hdcap->ctrl_saturation, active);
-	v4l2_ctrl_activate(hdcap->ctrl_hue, active);
-	v4l2_ctrl_activate(hdcap->ctrl_sharpness, active);
+	bool is_tw9900 = input == INPUT_COMPOSITE || input == INPUT_SVIDEO;
+	bool is_mst3367 = input == INPUT_COMPONENT || input == INPUT_HDMI;
+
+	v4l2_ctrl_activate(hdcap->ctrl_brightness, is_tw9900);
+	v4l2_ctrl_activate(hdcap->ctrl_contrast, is_tw9900);
+	v4l2_ctrl_activate(hdcap->ctrl_saturation, is_tw9900);
+	v4l2_ctrl_activate(hdcap->ctrl_hue, is_tw9900);
+	v4l2_ctrl_activate(hdcap->ctrl_sharpness, is_tw9900);
+
+	v4l2_ctrl_activate(hdcap->ctrl_csc, is_mst3367);
 }
 
 static int usb3hdcap_g_input(struct file *file, void *priv, unsigned int *i)
@@ -594,6 +609,9 @@ static int usb3hdcap_s_input(struct file *file, void *priv, unsigned int i)
 		return -EBUSY;
 
 	hdcap->input = i;
+
+	usb3hdcap_activate_ctrls(hdcap, i);
+
 	ret = usb3hdcap_hw_init(hdcap);
 	if (ret < 0) {
 		hdcap->input = old_input;
@@ -608,9 +626,6 @@ static int usb3hdcap_s_input(struct file *file, void *priv, unsigned int i)
 		hdcap->video_dev.tvnorms = USB3HDCAP_V4L2_STDS;
 	else
 		hdcap->video_dev.tvnorms = 0;
-
-	usb3hdcap_activate_tw9900_ctrls(hdcap,
-		i == INPUT_COMPOSITE || i == INPUT_SVIDEO);
 
 	return 0;
 }
@@ -745,6 +760,9 @@ static int usb3hdcap_s_ctrl(struct v4l2_ctrl *ctrl)
 		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_HUE, (u8)ctrl->val);
 	case V4L2_CID_SHARPNESS:
 		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_SHARPNESS, ctrl->val);
+	case V4L2_CID_USB3HDCAP_CSC:
+		mst3367_write_csc(hdcap);
+		return 0;
 	default:
 		return -EINVAL;
 	}
@@ -764,6 +782,17 @@ static int usb3hdcap_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 static const struct v4l2_ctrl_ops usb3hdcap_ctrl_ops = {
 	.s_ctrl = usb3hdcap_s_ctrl,
 	.g_volatile_ctrl = usb3hdcap_g_volatile_ctrl,
+};
+
+static const struct v4l2_ctrl_config usb3hdcap_csc_ctrl = {
+	.ops = &usb3hdcap_ctrl_ops,
+	.id = V4L2_CID_USB3HDCAP_CSC,
+	.name = "Color Space Conversion",
+	.type = V4L2_CTRL_TYPE_MENU,
+	.min = 0,
+	.max = CSC_YCBCR_HDMI,
+	.def = CSC_DEFAULT_HDMI,
+	.qmenu = csc_menu,
 };
 
 static int usb3hdcap_subscribe_event(struct v4l2_fh *fh,
@@ -856,7 +885,7 @@ static int video_init(struct usb3hdcap *hdcap)
 		return ret;
 	}
 
-	v4l2_ctrl_handler_init(&hdcap->ctrl, 6);
+	v4l2_ctrl_handler_init(&hdcap->ctrl, 7);
 	hdcap->ctrl_brightness = v4l2_ctrl_new_std(&hdcap->ctrl,
 		&usb3hdcap_ctrl_ops, V4L2_CID_BRIGHTNESS, -128, 127, 1, -9);
 	hdcap->ctrl_contrast = v4l2_ctrl_new_std(&hdcap->ctrl,
@@ -872,6 +901,8 @@ static int video_init(struct usb3hdcap *hdcap)
 	if (hdcap->ctrl_rx_power)
 		hdcap->ctrl_rx_power->flags |= V4L2_CTRL_FLAG_VOLATILE |
 						V4L2_CTRL_FLAG_READ_ONLY;
+	hdcap->ctrl_csc = v4l2_ctrl_new_custom(&hdcap->ctrl,
+		&usb3hdcap_csc_ctrl, NULL);
 	ret = hdcap->ctrl.error;
 	if (ret < 0) {
 		dev_warn(hdcap->dev, "Could not initialize controls\n");

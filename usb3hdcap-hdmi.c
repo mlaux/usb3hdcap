@@ -7,6 +7,7 @@
 #include <linux/delay.h>
 #include <linux/usb.h>
 #include <linux/v4l2-dv-timings.h>
+#include <media/v4l2-ctrls.h>
 
 #include "usb3hdcap.h"
 
@@ -272,7 +273,7 @@ static const u8 csc_conversion[] = {
 	0x08, 0x2d,  0x03, 0x74,  0x7e, 0x22,
 	0x78, 0x94,  0x0b, 0x9f,  0x79, 0xb3,
 	0x7f, 0x40,  0x01, 0x2c,  0x08, 0x2d,
-	0x20, 0x00,  0x00, 0x00,  0x20, 0x00,
+	0x20, 0x00,  0x04, 0x00,  0x20, 0x00,
 };
 
 /* Identity CSC for HDMI RGB sources */
@@ -290,24 +291,14 @@ static const u8 csc_identity_component[] = {
 	0x00, 0x00,  0x00, 0x00,  0x10, 0x00, 
 	0x20, 0x00,  0x03, 0x80,  0x20, 0x00,
 };
-
-static void mst3367_write_csc(struct usb3hdcap *hdcap)
+void mst3367_write_csc(struct usb3hdcap *hdcap)
 {
-	bool comp = (hdcap->input == INPUT_COMPONENT);
-	bool ycbcr = false;
+	int csc_mode = hdcap->ctrl_csc ? hdcap->ctrl_csc->val : CSC_DEFAULT_HDMI;
+	bool ycbcr = (csc_mode == CSC_YCBCR_HDMI);
+	bool comp = (csc_mode == CSC_DEFAULT_COMPONENT);
 	const u8 *csc;
 	u8 old_ab, reg_92;
-	int k, avi;
-
-	if (hdcap->input == INPUT_HDMI) {
-		mst_bank(hdcap, 0x02);
-		avi = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x4a);
-		if (avi >= 0 && ((avi >> 2) & 3) != 0) {
-			ycbcr = true;
-			dev_info(hdcap->dev,
-				"HDMI source is YCbCr (0x4a=0x%02x)\n", avi);
-		}
-	}
+	int k;
 
 	mst_bank(hdcap, 0x00);
 
@@ -404,7 +395,6 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 		if (status == 0x7f) {
 			const struct v4l2_dv_timings *std;
 			int htotal, vtotal, hactive;
-			int pll;
 
 			htotal = (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x6a) << 8 |
 				  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x6b)) & 0xfff;
@@ -438,17 +428,11 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 			mst_bank(hdcap, 0x00);
 			u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x00);
 
-			/* PLL re-toggle */
-			mst_bank(hdcap, 0x02);
-			pll = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x07);
-			u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, pll | 0x10);
-			u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, pll & ~0x10);
-
 			return 0;
 		}
 
 		/* Not locked yet */
-		u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x00);
+		u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x80);
 		msleep(100);
 	}
 
@@ -633,7 +617,6 @@ static int component_poll_signal(
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5e);
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5f);
 
-		/* PLL status */
 		mst_bank(hdcap, 0x02);
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x11);
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x12);
@@ -710,7 +693,7 @@ int usb3hdcap_hdmi_init(struct usb3hdcap *hdcap)
 	if (ret < 0)
 		return ret;
 
-	mst3367_write_csc(hdcap);
+	v4l2_ctrl_handler_setup(&hdcap->ctrl);
 
 	dev_info(hdcap->dev, "hdmi_init: complete (%dx%d)\n",
 		hdcap->width, hdcap->height);
@@ -765,7 +748,7 @@ int usb3hdcap_component_init(struct usb3hdcap *hdcap)
 
 	component_write_scaler(hdcap, mode);
 
-	mst3367_write_csc(hdcap);
+	v4l2_ctrl_handler_setup(&hdcap->ctrl);
 
 	use_height = hdcap->interlaced ? hdcap->height * 2 : hdcap->height;
 	dev_info(hdcap->dev, "component_init: complete (%dx%d%s)\n",
