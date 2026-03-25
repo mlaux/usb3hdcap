@@ -20,9 +20,9 @@ struct component_mode {
 	int width, height;
 	int refresh_rate;
 	int interlaced;
-	/* MST3367 bank 0 scaler registers */
-	u8 reg_03, reg_05, reg_06, reg_07;
-	u8 reg_1e, reg_1f;
+	/* MST3367 bank 0 ADC/scaler registers (ref: SetADParameters) */
+	u8 pllgain, clpdly, clpdur, hsopw;
+	u8 adc_bw0, adc_bw1;
 	u16 scaler_htotal;
 	u16 hde_off;
 	u8 vde_off;
@@ -38,6 +38,8 @@ struct component_mode {
  * won't either
  */
 static const struct component_mode component_modes[] = {
+	/*                                pll   clp   clp   hsop  adc   adc                    */
+	/*                                gain  dly   dur   w     bw0   bw1   sclht  hde   vde */
 	/* 480i */
 	{  250,  275,   720,  240, 60, 1, 0x08, 0x08, 0x08, 0x18, 0x44, 0x04, 0x35a, 0x76, 0x12,
 	   V4L2_DV_BT_CEA_720X480I59_94 },
@@ -115,18 +117,23 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 
 	mst_bank(hdcap, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x51, 0x80);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb7, 0x02);
+	/* RxTmdsHotPlug: all off */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xb7, 0xff, 0x02);
+	/* RxGeneralInit */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x41, 0x6f);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x00);
+	/* RxVideoInit */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb0, 0x14);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xae, 0x04);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xad, 0x05);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xae, ~0x04, 0x04);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xad, 0x05); /* low-pass filter */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb1, 0xc0);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb2, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb3, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb4, 0x55);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb4, 0x54);
+	/* RxAudioInit */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xb4, ~0x03, 0x00);
 
+	/* RxTmdsInit */
 	mst_bank(hdcap, 0x01);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0f, 0x02);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x16, 0x30);
@@ -134,17 +141,20 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x18, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x19, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1a, 0x50);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2a, 0x07);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x2a, ~0x07, 0x07);
+	/* RxHdcpInit */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x24, 0x40);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x25, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x30, 0x80);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x31, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x32, 0x00);
 
 	mst_bank(hdcap, 0x02);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x08, 0x03);
+	/* RxAudioInit (cont'd) */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x01, 0x61);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x02, 0xf5);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x03, 0x02);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x03, ~0x02, 0x02);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x04, 0x01);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x05, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x06, 0x08);
@@ -152,34 +162,38 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1d, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1e, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1f, 0x00);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x25, 0xa2);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, 0x04);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x25, (u8)~0xa2, 0xa2);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x07, ~0x04, 0x04);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x17, 0xc0);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x19, 0xff);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1a, 0xff);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1b, 0xfc);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x20, 0x00);
-	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x21, 0xfc, 0x00);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x21, ~0x03, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x22, 0x26);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x27, 0x00);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2e, 0xa1);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x2e, (u8)~0xa1, 0xa1);
 
 	mst_bank(hdcap, 0x00);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xab, 0x15);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xac, 0x15);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x10);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xab, 0x15); /* COLOR.RANGE */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xac, 0x15); /* COLOR.RANGE */
+
+	/* RxHdcpReset */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x10); /* HDCP.RESET */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x00);
 
+	/* RxHdmiReset */
 	mst_bank(hdcap, 0x02);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, 0xf4);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, 0x04);
 
+	/* RxSwitchSource: 0x81 = HDMI TMDS.A */
 	mst_bank(hdcap, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x51, 0x81);
-
+	/* RxTmdsHotPlug: link on */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb7, 0x00);
 
-	/* FUN_140249ec8 */
+	/* RxHdmiInit */
 	mst_bank(hdcap, 0x02);
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x01, 0x0f, 0x60);
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x04, 0xff, 0x01);
@@ -268,79 +282,111 @@ static void cpld_init(struct usb3hdcap *hdcap, u8 mux_val)
 	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x11, 0xfc);
 }
 
-/* Conversion for YCbCr HDMI sources from Windows driver USB capture */
-static const u8 csc_conversion[] = {
-	0x08, 0x2d,  0x03, 0x74,  0x7e, 0x22,
-	0x78, 0x94,  0x0b, 0x9f,  0x79, 0xb3,
-	0x7f, 0x40,  0x01, 0x2c,  0x08, 0x2d,
+/* Identity CSC for component YPbPr */
+static const u8 csc_identity_component[] = {
+	0x10, 0x00,  0x00, 0x00,  0x00, 0x00, /* M11, M12, M13 */
+	0x00, 0x00,  0x10, 0x00,  0x00, 0x00, /* M21, M22, M23 */
+	0x00, 0x00,  0x00, 0x00,  0x10, 0x00, /* M31, M32, M33 */
+	0x20, 0x00,  0x03, 0x80,  0x20, 0x00, /*  A1,  A2,  A3 */
+};
+
+/* Identity CSC for HDMI YCbCr */
+static const u8 csc_identity_hdmi[] = {
+	0x10, 0x00,  0x00, 0x00,  0x00, 0x00,
+	0x00, 0x00,  0x10, 0x00,  0x00, 0x00,
+	0x00, 0x00,  0x00, 0x00,  0x10, 0x00,
 	0x20, 0x00,  0x04, 0x00,  0x20, 0x00,
 };
 
-/* Identity CSC for HDMI RGB sources */
-static const u8 csc_identity_hdmi[] = {
-	0x10, 0x00,  0x00, 0x00,  0x00, 0x00, 
-	0x00, 0x00,  0x10, 0x3f,  0x00, 0x00,
-	0x00, 0x00,  0x00, 0x00,  0x10, 0x00,
+/* BT.601 for SD (width <= 720) */
+static const u8 csc_r2y_sd[] = {
+	0x08, 0x02,  0x04, 0xc5,  0xfd, 0x4d,
+	0xf9, 0x4a,  0x09, 0x5b,  0xfa, 0xb1,
+	0xfe, 0xb4,  0x01, 0xd2,  0x08, 0x02,
 	0x20, 0x00,  0x00, 0x00,  0x20, 0x00,
 };
 
-/* Identity CSC for component YPbPr */
-static const u8 csc_identity_component[] = {
-	0x10, 0x00,  0x00, 0x00,  0x00, 0x00, 
-	0x00, 0x00,  0x10, 0x00,  0x00, 0x00, 
-	0x00, 0x00,  0x00, 0x00,  0x10, 0x00, 
-	0x20, 0x00,  0x03, 0x80,  0x20, 0x00,
+/* BT.709 for HD (width > 720) */
+static const u8 csc_r2y_hd[] = {
+	0x08, 0x02,  0x03, 0x65,  0xfe, 0x28,
+	0xf8, 0xb9,  0x0b, 0x65,  0xf9, 0xd6,
+	0xff, 0x45,  0x01, 0x27,  0x08, 0x02,
+	0x20, 0x00,  0x00, 0x00,  0x20, 0x00,
 };
+
 void mst3367_write_csc(struct usb3hdcap *hdcap)
 {
-	int csc_mode = hdcap->ctrl_csc ? hdcap->ctrl_csc->val : CSC_DEFAULT_HDMI;
-	bool ycbcr = (csc_mode == CSC_YCBCR_HDMI);
-	bool comp = (csc_mode == CSC_DEFAULT_COMPONENT);
+	bool comp = (hdcap->input == INPUT_COMPONENT);
 	const u8 *csc;
 	u8 old_ab, reg_92;
 	int k;
 
+	if (comp) {
+		reg_92 = 0x66;
+		csc = csc_identity_component;
+	} else {
+		/*
+		 * Auto-detect HDMI input colorspace:
+		 *
+		 * RxHdmiPacketStatus (0x02:0x0B/0x0C/0x0E): bit 3 indicates
+		 * an AVI InfoFrame has been received?
+		 * RxHdmiPacketColor (0x02:0x48 bits 6:5):
+		 *   0x00 = RGB, 0x20 = YUV422, 0x40 = YUV444
+		 */
+		int pkt_status, color = 0x00;
+
+		mst_bank(hdcap, 0x02);
+		pkt_status = (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x0c) & 0x3f) << 8 |
+			     (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x0b) & 0xff);
+		if (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x0e) & 0x08)
+			pkt_status |= 0x8000;
+
+		if (pkt_status & 0x0008) {
+			color = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x48) & 0x60;
+		}
+
+		dev_info(hdcap->dev,
+			 "CSC: pkt_status=0x%04x color=0x%02x\n",
+			 pkt_status, color);
+
+		if (color == 0x00) {
+			/* RGB: need R2Y conversion for YUV422 output */
+			reg_92 = 0x40;
+			csc = (hdcap->width <= 720) ? csc_r2y_sd : csc_r2y_hd;
+			dev_info(hdcap->dev, "CSC: HDMI RGB, %s R2Y\n",
+				 (hdcap->width <= 720) ? "BT.601" : "BT.709");
+		} else {
+			/* YCbCr input: identity passthrough, pre-offset
+			 * subtracts 128 from Cb/Cr before matrix */
+			reg_92 = 0x62;
+			csc = csc_identity_hdmi;
+			dev_info(hdcap->dev, "CSC: HDMI YCbCr (0x%02x), identity\n",
+				 color);
+		}
+	}
+
 	mst_bank(hdcap, 0x00);
 
+	/* BLANK.OUTPUT while changing CSC */
 	u3hc_i2c_rmw_get_old(hdcap, ADDR_MST3367, 0xab, 0x7f, 0x80, &old_ab);
 
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x90, 0x15);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x91, 0x15);
-
-	if (comp)
-		reg_92 = 0x66;
-	else if (ycbcr)
-		reg_92 = 0x40;
-	else
-		reg_92 = 0x62;
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x90, 0x15); /* COLOR.RANGE */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x91, 0x15); /* COLOR.RANGE */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x92, reg_92);
 
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xac, comp ? 0x15 : 0x95);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xad, 0x05);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1e, 0x11);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1f, 0x01);
-
-	if (ycbcr)
-		csc = csc_conversion;
-	else if (comp)
-		csc = csc_identity_component;
-	else
-		csc = csc_identity_hdmi;
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xac, ~0x3f, 0x15); /* COLOR.RANGE */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xad, 0x05); /* sharpness: low-pass filter */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1e, 0x11); /* sharpness */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1f, 0x01); /* sharpness */
 
 	for (k = 0; k < 24; k++)
 		u3hc_i2c_write(hdcap, ADDR_MST3367, 0x93 + k, csc[k]);
 
-	/*
-	 * from hdcapm driver:
-	 * 0x25 = RX_OUTPUT_YUV422 / 10.BITS / EXTERNAL SYNC,
-	 * 0x21 = RX_OUTPUT_YUV422 / 08.BITS / EMBEDDED SYNC,
-	 * 0x24 = RX_OUTPUT_YUV422 / 10.BITS / EXTERNAL SYNC,
-	 * 0x20 = RX_OUTPUT_YUV422 / 08.BITS / EXTERNAL SYNC
-	 */
+	/* RX_OUTPUT_YUV422 / 08.BITS / EMBEDDED SYNC */
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xb0, 0xc2, 0x21);
+	/* NORMAL.OUTPUT (un-blank) */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xab, old_ab & 0x7f);
 
-	/* some kind of output enable */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb3, 0x00);
 
 	mst_bank(hdcap, 0x02);
@@ -392,7 +438,7 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 				"HDMI signal poll[%d]: lock=0x%02x\n",
 				k, status);
 
-		if (status == 0x7f) {
+		if (status & 0x3c) {
 			const struct v4l2_dv_timings *std;
 			int htotal, vtotal, hactive;
 
@@ -424,14 +470,14 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 			hdcap->bpl = hdcap->width * 2;
 			hdcap->interlaced = 0;
 
-			/* "DISABLE AUTO POSITION" idk why windows does this here */
+			/* DISABLE AUTO POSITION */
 			mst_bank(hdcap, 0x00);
 			u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x00);
 
 			return 0;
 		}
 
-		/* Not locked yet */
+		/* Not locked yet, ENABLE AUTO POSITION */
 		u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x80);
 		msleep(100);
 	}
@@ -446,21 +492,19 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 
 static void mst3367_adc_config(struct usb3hdcap *hdcap)
 {
-	/*
-	 * not sure what any of these do other than only being used in the
-	 * analog path
-	 */
+	/* RxAdcInit */
 	mst_bank(hdcap, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x00, 0x80);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x24, 0xc0);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x00, 0x00);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x21, 0x01);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x04, 0x00);
-	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x10, 0xdf, 0x40);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x21, ~0x07, 0x01);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x04, 0x00); /* ADC phase */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x10, 0x0f, 0xd0);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x11, 0x2d);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x20, 0xc0);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x21, 0x04);
-	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x0e, 0xff, 0x30);
+	/* bits 5:4 = sync source: 0x30 = SOG for component */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x0e, 0xcf, 0x30);
 }
 
 static const struct component_mode *match_component_mode(int vtotal)
@@ -506,19 +550,23 @@ static void component_write_scaler(
 	 */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x12, is_720_low_rr ? 0x00 : 0x04);
 
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x03, m->reg_03);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x05, m->reg_05);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x06, m->reg_06);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, m->reg_07);
+	/* SetADParameters */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x03, m->pllgain);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x05, m->clpdly);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x06, m->clpdur);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x07, m->hsopw);
 
+	/* ADC gain: Y, Cb, Cr */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x08, 0xa0);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x09, 0xc0);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0a, 0xa0);
 
+	/* grade scale (clamp level): Y, Cb, Cr */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0b, 0x80);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0c, 0x60);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0d, 0x80);
 
+	/* clamp offset: Y, Cb, Cr */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x18, 0x10);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x19, 0x10);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1a, 0x10);
@@ -526,11 +574,11 @@ static void component_write_scaler(
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1c, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1d, 0x00);
 
-	/* output timing */
+	/* ADCSetAutoDetectFormat: output htotal */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x01, ht >> 4);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x02, (ht & 0x0f) << 4);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1e, m->reg_1e);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1f, m->reg_1f);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1e, m->adc_bw0);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1f, m->adc_bw1);
 
 	/* output data enable start pos after sync */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x80, (m->hde_off >> 8) & 0x0f);
@@ -544,8 +592,7 @@ static void component_write_scaler(
 
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2d, 0x11);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2e, 0x11);
-	/* reg 0x39 = reg_05 + reg_06 - 0x78 (from decompiled code) */
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x39, (u8) (m->reg_05 + m->reg_06 - 0x78));
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x39, (u8) (m->clpdly + m->clpdur - 0x78));
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2c, 0x9d);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x3a, 0x0c);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x3b, 0x08);
@@ -572,9 +619,11 @@ static int component_poll_signal(
 	vendor_out(hdcap, REQ_STREAM, 0x0000, 0, NULL, 0);
 
 	/*
+	 * RxAdcModeDetect()
 	 * Signal detection per decompiled Windows driver:
-	 *   0x14 & 0x90 == 0x90: fully synced
-	 *   0x14 & 0x90 == 0x80: H lock
+	 *   0x14 & 0x90 == 0x90: H+V locked (status=1)
+	 *   0x14 & 0x90 == 0x80: H lock only (status=2)
+	 *   0x14 == 0x00 && 0x15 & 0x40: status=3
 	 */
 	for (k = 0; k < 100; k++) {
 		int signal_type;
@@ -585,7 +634,6 @@ static int component_poll_signal(
 		u3hc_i2c_write(hdcap, ADDR_MST3367, 0x0e, 0x40);
 
 		status = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x14);
-		/* needed ? */
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x15);
 
 		/* Check signal presence from 0x14 bits 7,4 */
@@ -596,23 +644,24 @@ static int component_poll_signal(
 		else
 			signal_count = 0;
 
-		/* Read H timing */
+		/* Read H period */
 		htotal = ((u3hc_i2c_read(hdcap, ADDR_MST3367, 0x57) & 0x3f) << 8) |
 			  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x58);
 
-		/* scale ADC sample rate to htotal like Windows driver */
+		/* scale ADC sample rate to H period */
 		if (htotal > 0)
 			u3hc_i2c_write(hdcap, ADDR_MST3367, 0x11,
 				  (htotal < 0x401 ? 0x400 : htotal) >> 7);
 
-		/* Read V timing, not sure if this is actually needed? */
+		/* V period (timer counts) */
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x59);
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5a);
 
-		/* Read Vtotal */
+		/* V total (lines) */
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5b);
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5c);
 
+		/* H total (pixels), interlace flag */
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5d);
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5e);
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5f);
@@ -720,7 +769,7 @@ int usb3hdcap_component_init(struct usb3hdcap *hdcap)
 	/* CPLD init with component input mux */
 	cpld_init(hdcap, 0x80);
 
-	/* Component source select (MST3367 internal ADC for YPbPr) */
+	/* RxSwitchSource: 0x21 = component ADC (YPbPr) */
 	mst_bank(hdcap, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x51, 0x21);
 
