@@ -968,7 +968,7 @@ static int usb3hdcap_probe(struct usb_interface *intf,
 
 	/* hdcap = kzalloc_obj(*hdcap, GFP_KERNEL); */
 	hdcap = kzalloc(sizeof(struct usb3hdcap), GFP_KERNEL);
-	if (hdcap == NULL)
+	if (!hdcap)
 		return -ENOMEM;
 
 	hdcap->dev = dev;

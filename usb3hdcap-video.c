@@ -469,7 +469,7 @@ static void usb3hdcap_buf_queue(struct vb2_buffer *vb)
 	struct hdcap_buf *buf = container_of(vbuf, struct hdcap_buf, vb);
 	unsigned long flags;
 
-	if (hdcap->usb_dev == NULL) {
+	if (!hdcap->usb_dev) {
 		dev_warn(hdcap->dev, "buf_queue: usb_dev is NULL\n");
 		vb2_buffer_done(vb, VB2_BUF_STATE_ERROR);
 		return;
@@ -485,7 +485,7 @@ static int usb3hdcap_start_streaming(struct vb2_queue *vq, unsigned int count)
 	struct usb3hdcap *hdcap = vb2_get_drv_priv(vq);
 	int ret;
 
-	if (hdcap->usb_dev == NULL) {
+	if (!hdcap->usb_dev) {
 		dev_err(hdcap->dev, "start_streaming: usb_dev is NULL\n");
 		return -ENODEV;
 	}

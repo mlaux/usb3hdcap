@@ -341,9 +341,8 @@ void mst3367_write_csc(struct usb3hdcap *hdcap)
 		if (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x0e) & 0x08)
 			pkt_status |= 0x8000;
 
-		if (pkt_status & 0x0008) {
+		if (pkt_status & 0x0008)
 			color = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x48) & 0x60;
-		}
 
 		dev_info(hdcap->dev,
 			 "CSC: pkt_status=0x%04x color=0x%02x\n",
@@ -357,7 +356,8 @@ void mst3367_write_csc(struct usb3hdcap *hdcap)
 				 (hdcap->width <= 720) ? "BT.601" : "BT.709");
 		} else {
 			/* YCbCr input: identity passthrough, pre-offset
-			 * subtracts 128 from Cb/Cr before matrix */
+			 * subtracts 128 from Cb/Cr before matrix
+			 */
 			reg_92 = 0x62;
 			csc = csc_identity_hdmi;
 			dev_info(hdcap->dev, "CSC: HDMI YCbCr (0x%02x), identity\n",
