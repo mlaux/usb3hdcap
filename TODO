@@ -12,4 +12,3 @@
 * Generify CS53L21 support (can probably base it on sound/soc/codecs/cs53l30.c)
 * Use v4l2_fh
 * Fix MST3367 support for XCAPTURE-1
-* Implement autodetection for HDMI color space

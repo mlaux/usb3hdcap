@@ -66,7 +66,6 @@ static const struct component_mode component_modes[] = {
 /*
  * Known CEA timing table - maps (htotal, vtotal, hactive) to full
  * v4l2_dv_timings. HD htotal = standard * 1.5 (MST3367 counter rate?)
- * 1080p30 omitted: same htotal/vtotal as 1080p60, can't distinguish.
  */
 struct hdmi_std {
 	int htotal_min, htotal_max;
@@ -87,6 +86,7 @@ static const struct hdmi_std hdmi_stds[] = {
 	 * claims to be outputting 60...
 	 */
 	{ 2740, 2760, 1120, 1130, 1920, V4L2_DV_BT_CEA_1920X1080P30 },
+	{ 3290, 3310,  555,  570, 1920, V4L2_DV_BT_CEA_1920X1080I60 },
 	{ 3950, 3970, 1120, 1130, 1920, V4L2_DV_BT_CEA_1920X1080P50 },
 	{ 2190, 2210, 1120, 1130, 1920, V4L2_DV_BT_CEA_1920X1080P60 },
 	{ 3290, 3310, 1120, 1130, 1920, V4L2_DV_BT_CEA_1920X1080P60 },
@@ -466,9 +466,10 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 			hdcap->detected_timings_present = 1;
 			hdcap->std = 0; /* no SD standard */
 			hdcap->width = std->bt.width;
-			hdcap->height = std->bt.height;
+			hdcap->interlaced = std->bt.interlaced;
+			hdcap->height = std->bt.interlaced
+				? std->bt.height / 2 : std->bt.height;
 			hdcap->bpl = hdcap->width * 2;
-			hdcap->interlaced = 0;
 
 			/* DISABLE AUTO POSITION */
 			mst_bank(hdcap, 0x00);
