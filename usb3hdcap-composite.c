@@ -65,11 +65,11 @@ static void usb3hdcap_detect_size(struct usb3hdcap *hdcap)
 	if (status >= 0 && (status & TW9900_NINTL)) {
 		hdcap->interlaced = 0;
 		dev_info(hdcap->dev, "NINTL=1: %dp detected (SDTR=0x%02x)\n",
-			half_h, status);
+			 half_h, status);
 	} else {
 		hdcap->interlaced = 1;
 		dev_info(hdcap->dev, "NINTL=0: %di detected (SDTR=0x%02x)\n",
-			full_h, status);
+			 full_h, status);
 	}
 }
 

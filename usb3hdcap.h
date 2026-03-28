@@ -28,12 +28,6 @@ enum usb3hdcap_input {
 	INPUT_HDMI      = 3,
 };
 
-enum usb3hdcap_csc {
-	CSC_DEFAULT_COMPONENT = 0,
-	CSC_DEFAULT_HDMI      = 1,
-	CSC_YCBCR_HDMI        = 2,
-};
-
 /* I2C 8-bit addresses */
 #define ADDR_MST3367 0x9c
 #define ADDR_TW9900  0x88
@@ -152,7 +146,9 @@ struct usb3hdcap {
 	struct v4l2_ctrl *ctrl_sharpness;
 	struct v4l2_ctrl *ctrl_rx_power;
 
+	/* protects V4L2 ioctls and device state */
 	struct mutex v4l2_lock;
+	/* protects videobuf2 queue operations */
 	struct mutex vb2q_lock;
 
 	/* buffer list */
@@ -190,7 +186,6 @@ struct usb3hdcap {
 
 	/* MST3367 state */
 	int mst_current_bank;
-	struct v4l2_ctrl *ctrl_csc;
 	struct v4l2_dv_timings detected_timings;
 	int detected_timings_present;
 	struct v4l2_dv_timings requested_timings;

@@ -91,8 +91,7 @@ static int snd_hdcap_trigger(struct snd_pcm_substream *substream, int cmd)
 	return 0;
 }
 
-static snd_pcm_uframes_t snd_hdcap_pointer(
-	struct snd_pcm_substream *substream)
+static snd_pcm_uframes_t snd_hdcap_pointer(struct snd_pcm_substream *substream)
 {
 	struct usb3hdcap *hdcap = snd_pcm_substream_chip(substream);
 
@@ -145,13 +144,11 @@ void usb3hdcap_audio_data(struct usb3hdcap *hdcap, const u8 *data, int len)
 	if (buffer_pos + nframes >= runtime->buffer_size) {
 		size_t cnt = (runtime->buffer_size - buffer_pos) * frame_bytes;
 
-		memcpy(runtime->dma_area + buffer_pos * frame_bytes,
-			data, cnt);
-		memcpy(runtime->dma_area, data + cnt,
-			nframes * frame_bytes - cnt);
+		memcpy(runtime->dma_area + buffer_pos * frame_bytes, data, cnt);
+		memcpy(runtime->dma_area, data + cnt, nframes * frame_bytes - cnt);
 	} else {
-		memcpy(runtime->dma_area + buffer_pos * frame_bytes,
-			data, nframes * frame_bytes);
+		memcpy(runtime->dma_area + buffer_pos * frame_bytes, data,
+		       nframes * frame_bytes);
 	}
 
 	buffer_pos += nframes;
@@ -258,16 +255,15 @@ int usb3hdcap_audio_init(struct usb3hdcap *hdcap)
 	atomic_set(&hdcap->snd_stream, 0);
 
 	ret = snd_card_new(hdcap->dev, SNDRV_DEFAULT_IDX1, "usb3hdcap",
-		THIS_MODULE, 0, &card);
+			   THIS_MODULE, 0, &card);
 	if (ret < 0)
 		return ret;
 
 	strscpy(card->driver, "usb3hdcap", sizeof(card->driver));
-	strscpy(card->shortname, "USB3HDCAP Audio",
-		sizeof(card->shortname));
+	strscpy(card->shortname, "USB3HDCAP Audio", sizeof(card->shortname));
 	snprintf(card->longname, sizeof(card->longname),
-		"USB3HDCAP Audio at bus %d device %d",
-		hdcap->usb_dev->bus->busnum, hdcap->usb_dev->devnum);
+		 "USB3HDCAP Audio at bus %d device %d",
+		 hdcap->usb_dev->bus->busnum, hdcap->usb_dev->devnum);
 
 	hdcap->snd = card;
 
@@ -280,8 +276,8 @@ int usb3hdcap_audio_init(struct usb3hdcap *hdcap)
 	pcm->private_data = hdcap;
 
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_hdcap_pcm_ops);
-	snd_pcm_set_managed_buffer_all(pcm, SNDRV_DMA_TYPE_CONTINUOUS,
-		NULL, HDCAP_AUDIO_BUFSZ, HDCAP_AUDIO_BUFSZ);
+	snd_pcm_set_managed_buffer_all(pcm, SNDRV_DMA_TYPE_CONTINUOUS, NULL,
+				       HDCAP_AUDIO_BUFSZ, HDCAP_AUDIO_BUFSZ);
 
 	ret = snd_card_register(card);
 	if (ret)

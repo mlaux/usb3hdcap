@@ -355,9 +355,7 @@ void mst3367_write_csc(struct usb3hdcap *hdcap)
 			dev_info(hdcap->dev, "CSC: HDMI RGB, %s R2Y\n",
 				 (hdcap->width <= 720) ? "BT.601" : "BT.709");
 		} else {
-			/* YCbCr input: identity passthrough, pre-offset
-			 * subtracts 128 from Cb/Cr before matrix
-			 */
+			/* YCbCr input: identity passthrough */
 			reg_92 = 0x62;
 			csc = csc_identity_hdmi;
 			dev_info(hdcap->dev, "CSC: HDMI YCbCr (0x%02x), identity\n",
@@ -398,10 +396,8 @@ void mst3367_write_csc(struct usb3hdcap *hdcap)
 /* Signal detection polling                                           */
 /* ------------------------------------------------------------------ */
 
-static const struct v4l2_dv_timings *match_hdmi_timing(
-	int htotal,
-	int vtotal,
-	int hactive)
+static const struct v4l2_dv_timings *match_hdmi_timing(int htotal, int vtotal,
+						       int hactive)
 {
 	int k;
 
@@ -435,8 +431,8 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 
 		if (k % 10 == 0)
 			dev_info(hdcap->dev,
-				"HDMI signal poll[%d]: lock=0x%02x\n",
-				k, status);
+				 "HDMI signal poll[%d]: lock=0x%02x\n",
+				 k, status);
 
 		if (status & 0x3c) {
 			const struct v4l2_dv_timings *std;
@@ -452,8 +448,8 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 				   u3hc_i2c_read(hdcap, ADDR_MST3367, 0x28)) & 0x1fff;
 
 			dev_info(hdcap->dev,
-				"HDMI locked: htotal=%d vtotal=%d hactive=%d\n",
-				htotal, vtotal, hactive);
+				 "HDMI locked: htotal=%d vtotal=%d hactive=%d\n",
+				 htotal, vtotal, hactive);
 
 			std = match_hdmi_timing(htotal, vtotal, hactive);
 			if (!std) {
@@ -526,15 +522,14 @@ static const struct component_mode *match_component_mode(int vtotal)
 /* Component scaler register write                                    */
 /* ------------------------------------------------------------------ */
 
-static void component_write_scaler(
-	struct usb3hdcap *hdcap,
-	const struct component_mode *m)
+static void component_write_scaler(struct usb3hdcap *hdcap,
+				   const struct component_mode *m)
 {
 	int ht = m->scaler_htotal - 1;
-	int is_720_low_rr = m->width == 1280 && m->height == 720
-			&& (m->refresh_rate == 24
-				|| m->refresh_rate == 25
-				|| m->refresh_rate == 30);
+	int is_720_low_rr = m->width == 1280 && m->height == 720 &&
+			(m->refresh_rate == 24 ||
+				m->refresh_rate == 25 ||
+				m->refresh_rate == 30);
 
 	mst_bank(hdcap, 0x00);
 
@@ -588,12 +583,12 @@ static void component_write_scaler(
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x83, m->width & 0xff);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x84, m->vde_off);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x85,
-		  ((m->height >> 8) & 0x0f) | (m->interlaced ? 0x20 : 0x00));
+		       ((m->height >> 8) & 0x0f) | (m->interlaced ? 0x20 : 0x00));
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x86, m->height & 0xff);
 
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2d, 0x11);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2e, 0x11);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x39, (u8) (m->clpdly + m->clpdur - 0x78));
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x39, (u8)(m->clpdly + m->clpdur - 0x78));
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2c, 0x9d);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x3a, 0x0c);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x3b, 0x08);
@@ -609,9 +604,8 @@ static void component_write_scaler(
 /* Component ADC signal polling                                       */
 /* ------------------------------------------------------------------ */
 
-static int component_poll_signal(
-	struct usb3hdcap *hdcap,
-	const struct component_mode **detected)
+static int component_poll_signal(struct usb3hdcap *hdcap,
+				 const struct component_mode **detected)
 {
 	const struct component_mode *mode;
 	int k, status, vtotal, htotal;
@@ -652,7 +646,7 @@ static int component_poll_signal(
 		/* scale ADC sample rate to H period */
 		if (htotal > 0)
 			u3hc_i2c_write(hdcap, ADDR_MST3367, 0x11,
-				  (htotal < 0x401 ? 0x400 : htotal) >> 7);
+				       (htotal < 0x401 ? 0x400 : htotal) >> 7);
 
 		/* V period (timer counts) */
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x59);
@@ -674,8 +668,8 @@ static int component_poll_signal(
 
 		if (k % 10 == 0)
 			dev_info(hdcap->dev,
-				"component poll[%d]: 0x14=0x%02x count=%d\n",
-				k, status, signal_count);
+				 "component poll[%d]: 0x14=0x%02x count=%d\n",
+				 k, status, signal_count);
 
 		if (signal_count < 3) {
 			msleep(100);
@@ -688,8 +682,8 @@ static int component_poll_signal(
 			  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5c);
 
 		dev_info(hdcap->dev,
-			"component locked: vtotal=%d htotal=%d 0x14=0x%02x\n",
-			vtotal, htotal, status);
+			 "component locked: vtotal=%d htotal=%d 0x14=0x%02x\n",
+			 vtotal, htotal, status);
 
 		mode = match_component_mode(vtotal);
 		if (!mode) {
@@ -746,7 +740,7 @@ int usb3hdcap_hdmi_init(struct usb3hdcap *hdcap)
 	v4l2_ctrl_handler_setup(&hdcap->ctrl);
 
 	dev_info(hdcap->dev, "hdmi_init: complete (%dx%d)\n",
-		hdcap->width, hdcap->height);
+		 hdcap->width, hdcap->height);
 	return 0;
 }
 
@@ -802,7 +796,7 @@ int usb3hdcap_component_init(struct usb3hdcap *hdcap)
 
 	use_height = hdcap->interlaced ? hdcap->height * 2 : hdcap->height;
 	dev_info(hdcap->dev, "component_init: complete (%dx%d%s)\n",
-		hdcap->width, use_height,
-		hdcap->interlaced ? "i" : "p");
+		 hdcap->width, use_height,
+		 hdcap->interlaced ? "i" : "p");
 	return 0;
 }

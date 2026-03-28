@@ -48,26 +48,12 @@
 #define USB3HDCAP_PID 0xf533
 #define XCAPTURE1_PID 0xf531
 
-#define V4L2_CID_USB3HDCAP_CSC (V4L2_CID_USER_BASE | 0x1000)
-
-static const char * const csc_menu[] = {
-	"Default (Component)",
-	"Default (HDMI)",
-	"YCbCr (HDMI)",
-	NULL,
-};
-
 /* ------------------------------------------------------------------ */
 /* USB control transfer helpers                                       */
 /* ------------------------------------------------------------------ */
 
-int vendor_out(
-	struct usb3hdcap *hdcap,
-	u8 request,
-	u16 value,
-	u16 index,
-	u8 *data,
-	u16 len)
+int vendor_out(struct usb3hdcap *hdcap, u8 request, u16 value, u16 index,
+	       u8 *data, u16 len)
 {
 	int ret;
 	u8 *buf = NULL;
@@ -79,10 +65,10 @@ int vendor_out(
 	}
 
 	ret = usb_control_msg(hdcap->usb_dev,
-		usb_sndctrlpipe(hdcap->usb_dev, 0),
-		request,
-		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-		value, index, buf, len, 1000);
+			      usb_sndctrlpipe(hdcap->usb_dev, 0),
+			      request,
+			      USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+			      value, index, buf, len, 1000);
 
 	kfree(buf);
 
@@ -95,13 +81,8 @@ int vendor_out(
 	return 0;
 }
 
-static int vendor_in(
-	struct usb3hdcap *hdcap,
-	u8 request,
-	u16 value,
-	u16 index,
-	u8 *data,
-	u16 len)
+static int vendor_in(struct usb3hdcap *hdcap, u8 request, u16 value, u16 index,
+		     u8 *data, u16 len)
 {
 	u8 *buf;
 	int ret;
@@ -111,10 +92,10 @@ static int vendor_in(
 		return -ENOMEM;
 
 	ret = usb_control_msg(hdcap->usb_dev,
-		usb_rcvctrlpipe(hdcap->usb_dev, 0),
-		request,
-		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-		value, index, buf, len, 1000);
+			      usb_rcvctrlpipe(hdcap->usb_dev, 0),
+			      request,
+			      USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+			      value, index, buf, len, 1000);
 
 	if (ret >= 0)
 		memcpy(data, buf, min_t(int, ret, len));
@@ -266,8 +247,8 @@ static void usb3hdcap_probe_mcu(struct usb3hdcap *hdcap)
 		dev_info(hdcap->dev, "Nuvoton NUC100 MCU detected\n");
 	} else {
 		dev_info(hdcap->dev,
-			"MCU probe response: %02x %02x %02x (not recognized)\n",
-			rx[0], rx[1], rx[2]);
+			 "Unrecognized MCU probe response: %02x %02x %02x\n",
+			 rx[0], rx[1], rx[2]);
 	}
 }
 
@@ -338,7 +319,7 @@ int usb3hdcap_hw_init(struct usb3hdcap *hdcap)
 /* ------------------------------------------------------------------ */
 
 static int usb3hdcap_querycap(struct file *file, void *priv,
-				struct v4l2_capability *cap)
+			      struct v4l2_capability *cap)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
@@ -351,7 +332,7 @@ static int usb3hdcap_querycap(struct file *file, void *priv,
 }
 
 static int usb3hdcap_enum_input(struct file *file, void *priv,
-					struct v4l2_input *i)
+				struct v4l2_input *i)
 {
 	if (i->index > INPUT_HDMI)
 		return -EINVAL;
@@ -383,7 +364,7 @@ static int usb3hdcap_enum_input(struct file *file, void *priv,
 }
 
 static int usb3hdcap_enum_fmt_vid_cap(struct file *file, void  *priv,
-					struct v4l2_fmtdesc *f)
+				      struct v4l2_fmtdesc *f)
 {
 	if (f->index > 0)
 		return -EINVAL;
@@ -393,7 +374,7 @@ static int usb3hdcap_enum_fmt_vid_cap(struct file *file, void  *priv,
 }
 
 static int usb3hdcap_fmt_vid_cap(struct file *file, void *priv,
-					struct v4l2_format *f)
+				 struct v4l2_format *f)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
@@ -492,10 +473,8 @@ const struct v4l2_dv_timings all_supported_dv_timings[] = {
 	V4L2_DV_BT_CEA_1920X1080P60,
 };
 
-static int usb3hdcap_g_dv_timings(
-	struct file *file,
-	void *priv,
-	struct v4l2_dv_timings *timings)
+static int usb3hdcap_g_dv_timings(struct file *file, void *priv,
+				  struct v4l2_dv_timings *timings)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
@@ -514,10 +493,8 @@ static int usb3hdcap_g_dv_timings(
 	return 0;
 }
 
-static int usb3hdcap_s_dv_timings(
-	struct file *file,
-	void *priv,
-	struct v4l2_dv_timings *timings)
+static int usb3hdcap_s_dv_timings(struct file *file, void *priv,
+				  struct v4l2_dv_timings *timings)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
@@ -529,10 +506,8 @@ static int usb3hdcap_s_dv_timings(
 	return 0;
 }
 
-static int usb3hdcap_enum_dv_timings(
-	struct file *file,
-	void *priv,
-	struct v4l2_enum_dv_timings *timings)
+static int usb3hdcap_enum_dv_timings(struct file *file, void *priv,
+				     struct v4l2_enum_dv_timings *timings)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
@@ -545,10 +520,8 @@ static int usb3hdcap_enum_dv_timings(
 	return 0;
 }
 
-static int usb3hdcap_dv_timings_cap(
-	struct file *file,
-	void *priv,
-	struct v4l2_dv_timings_cap *cap)
+static int usb3hdcap_dv_timings_cap(struct file *file, void *priv,
+				    struct v4l2_dv_timings_cap *cap)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
@@ -560,10 +533,8 @@ static int usb3hdcap_dv_timings_cap(
 	return 0;
 }
 
-static int usb3hdcap_query_dv_timings(
-	struct file *file,
-	void *priv,
-	struct v4l2_dv_timings *timings)
+static int usb3hdcap_query_dv_timings(struct file *file, void *priv,
+				      struct v4l2_dv_timings *timings)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
@@ -575,18 +546,15 @@ static int usb3hdcap_query_dv_timings(
 }
 
 static void usb3hdcap_activate_ctrls(struct usb3hdcap *hdcap,
-	enum usb3hdcap_input input)
+				     enum usb3hdcap_input input)
 {
 	bool is_tw9900 = input == INPUT_COMPOSITE || input == INPUT_SVIDEO;
-	bool is_mst3367 = input == INPUT_COMPONENT || input == INPUT_HDMI;
 
 	v4l2_ctrl_activate(hdcap->ctrl_brightness, is_tw9900);
 	v4l2_ctrl_activate(hdcap->ctrl_contrast, is_tw9900);
 	v4l2_ctrl_activate(hdcap->ctrl_saturation, is_tw9900);
 	v4l2_ctrl_activate(hdcap->ctrl_hue, is_tw9900);
 	v4l2_ctrl_activate(hdcap->ctrl_sharpness, is_tw9900);
-
-	v4l2_ctrl_activate(hdcap->ctrl_csc, is_mst3367);
 }
 
 static int usb3hdcap_g_input(struct file *file, void *priv, unsigned int *i)
@@ -630,10 +598,8 @@ static int usb3hdcap_s_input(struct file *file, void *priv, unsigned int i)
 	return 0;
 }
 
-static int usb3hdcap_enum_framesizes(
-	struct file *file,
-	void *priv,
-	struct v4l2_frmsizeenum *fsize)
+static int usb3hdcap_enum_framesizes(struct file *file, void *priv,
+				     struct v4l2_frmsizeenum *fsize)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
@@ -648,9 +614,7 @@ static int usb3hdcap_enum_framesizes(
 	return 0;
 }
 
-static void fill_timeperframe(
-	struct usb3hdcap *hdcap,
-	struct v4l2_fract *tf)
+static void fill_timeperframe(struct usb3hdcap *hdcap, struct v4l2_fract *tf)
 {
 	/*
 	 * using the frame rate here even for interlaced, spec isn't super
@@ -662,7 +626,7 @@ static void fill_timeperframe(
 		u32 vtotal = V4L2_DV_BT_FRAME_HEIGHT(bt);
 
 		tf->numerator = htotal * vtotal;
-		tf->denominator = (u32) bt->pixelclock;
+		tf->denominator = (u32)bt->pixelclock;
 		v4l2_simplify_fraction(&tf->numerator, &tf->denominator, 8, 333);
 	} else if (hdcap->std & V4L2_STD_625_50) {
 		/* PAL: 25fps */
@@ -675,10 +639,8 @@ static void fill_timeperframe(
 	}
 }
 
-static int usb3hdcap_g_parm(
-	struct file *file,
-	void *priv,
-	struct v4l2_streamparm *sp)
+static int usb3hdcap_g_parm(struct file *file, void *priv,
+			    struct v4l2_streamparm *sp)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
@@ -691,10 +653,8 @@ static int usb3hdcap_g_parm(
 	return 0;
 }
 
-static int usb3hdcap_s_parm(
-	struct file *file,
-	void *priv,
-	struct v4l2_streamparm *sp)
+static int usb3hdcap_s_parm(struct file *file, void *priv,
+			    struct v4l2_streamparm *sp)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
@@ -708,10 +668,8 @@ static int usb3hdcap_s_parm(
 	return 0;
 }
 
-static int usb3hdcap_enum_frameintervals(
-	struct file *file,
-	void *priv,
-	struct v4l2_frmivalenum *fival)
+static int usb3hdcap_enum_frameintervals(struct file *file, void *priv,
+					 struct v4l2_frmivalenum *fival)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
@@ -732,13 +690,13 @@ static int usb3hdcap_log_status(struct file *file, void *priv)
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
 	dev_info(hdcap->dev,
-		"status: iso_cbs=%u iso_bytes=%lu markers=%u frames=%u ",
-		hdcap->iso_cb_count, hdcap->iso_bytes,
-		hdcap->markers_found, hdcap->frames_delivered);
+		 "status: iso_cbs=%u iso_bytes=%lu markers=%u frames=%u ",
+		 hdcap->iso_cb_count, hdcap->iso_bytes,
+		 hdcap->markers_found, hdcap->frames_delivered);
 	dev_info(hdcap->dev,
-		"parse_len=%d frame_line=%d synced=%d was_blanking=%d ",
-		hdcap->parse_len, hdcap->frame_line,
-		hdcap->synced, hdcap->was_blanking);
+		 "parse_len=%d frame_line=%d synced=%d was_blanking=%d ",
+		 hdcap->parse_len, hdcap->frame_line,
+		 hdcap->synced, hdcap->was_blanking);
 	dev_info(hdcap->dev, "cur_buf=%p\n", hdcap->cur_buf);
 	return 0;
 }
@@ -760,9 +718,6 @@ static int usb3hdcap_s_ctrl(struct v4l2_ctrl *ctrl)
 		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_HUE, (u8)ctrl->val);
 	case V4L2_CID_SHARPNESS:
 		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_SHARPNESS, ctrl->val);
-	case V4L2_CID_USB3HDCAP_CSC:
-		mst3367_write_csc(hdcap);
-		return 0;
 	default:
 		return -EINVAL;
 	}
@@ -782,17 +737,6 @@ static int usb3hdcap_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 static const struct v4l2_ctrl_ops usb3hdcap_ctrl_ops = {
 	.s_ctrl = usb3hdcap_s_ctrl,
 	.g_volatile_ctrl = usb3hdcap_g_volatile_ctrl,
-};
-
-static const struct v4l2_ctrl_config usb3hdcap_csc_ctrl = {
-	.ops = &usb3hdcap_ctrl_ops,
-	.id = V4L2_CID_USB3HDCAP_CSC,
-	.name = "Color Space Conversion",
-	.type = V4L2_CTRL_TYPE_MENU,
-	.min = 0,
-	.max = CSC_YCBCR_HDMI,
-	.def = CSC_DEFAULT_HDMI,
-	.qmenu = csc_menu,
 };
 
 static int usb3hdcap_subscribe_event(struct v4l2_fh *fh,
@@ -887,22 +831,32 @@ static int video_init(struct usb3hdcap *hdcap)
 
 	v4l2_ctrl_handler_init(&hdcap->ctrl, 7);
 	hdcap->ctrl_brightness = v4l2_ctrl_new_std(&hdcap->ctrl,
-		&usb3hdcap_ctrl_ops, V4L2_CID_BRIGHTNESS, -128, 127, 1, -9);
+						   &usb3hdcap_ctrl_ops,
+						   V4L2_CID_BRIGHTNESS,
+						   -128, 127, 1, -9);
 	hdcap->ctrl_contrast = v4l2_ctrl_new_std(&hdcap->ctrl,
-		&usb3hdcap_ctrl_ops, V4L2_CID_CONTRAST, 0, 255, 1, 0x79);
+						 &usb3hdcap_ctrl_ops,
+						 V4L2_CID_CONTRAST,
+						 0, 255, 1, 0x79);
 	hdcap->ctrl_saturation = v4l2_ctrl_new_std(&hdcap->ctrl,
-		&usb3hdcap_ctrl_ops, V4L2_CID_SATURATION, 0, 255, 1, 0x80);
+						   &usb3hdcap_ctrl_ops,
+						   V4L2_CID_SATURATION,
+						   0, 255, 1, 0x80);
 	hdcap->ctrl_hue = v4l2_ctrl_new_std(&hdcap->ctrl,
-		&usb3hdcap_ctrl_ops, V4L2_CID_HUE, -128, 127, 1, 0);
+					    &usb3hdcap_ctrl_ops,
+					    V4L2_CID_HUE,
+					    -128, 127, 1, 0);
 	hdcap->ctrl_sharpness = v4l2_ctrl_new_std(&hdcap->ctrl,
-		&usb3hdcap_ctrl_ops, V4L2_CID_SHARPNESS, 0, 255, 1, 0x52);
+						  &usb3hdcap_ctrl_ops,
+						  V4L2_CID_SHARPNESS,
+						  0, 255, 1, 0x52);
 	hdcap->ctrl_rx_power = v4l2_ctrl_new_std(&hdcap->ctrl,
-		&usb3hdcap_ctrl_ops, V4L2_CID_DV_RX_POWER_PRESENT, 0, 1, 0, 1);
+						 &usb3hdcap_ctrl_ops,
+						 V4L2_CID_DV_RX_POWER_PRESENT,
+						 0, 1, 0, 1);
 	if (hdcap->ctrl_rx_power)
 		hdcap->ctrl_rx_power->flags |= V4L2_CTRL_FLAG_VOLATILE |
 						V4L2_CTRL_FLAG_READ_ONLY;
-	hdcap->ctrl_csc = v4l2_ctrl_new_custom(&hdcap->ctrl,
-		&usb3hdcap_csc_ctrl, NULL);
 	ret = hdcap->ctrl.error;
 	if (ret < 0) {
 		dev_warn(hdcap->dev, "Could not initialize controls\n");
@@ -935,7 +889,7 @@ static int video_init(struct usb3hdcap *hdcap)
 	}
 
 	dev_info(hdcap->dev, "%s: registered as %s\n",
-		__func__, video_device_node_name(&hdcap->video_dev));
+		 __func__, video_device_node_name(&hdcap->video_dev));
 
 	return 0;
 
@@ -950,11 +904,11 @@ ctrl_fail:
 }
 
 static int usb3hdcap_probe(struct usb_interface *intf,
-	const struct usb_device_id *id)
+			   const struct usb_device_id *id)
 {
 	struct device *dev;
 	struct usb3hdcap *hdcap;
-	int ret;
+	int ret, is_xcapture;
 
 	/* not using the interrupt interface, just data */
 	if (intf->cur_altsetting->desc.bInterfaceNumber != 0)
@@ -966,8 +920,7 @@ static int usb3hdcap_probe(struct usb_interface *intf,
 
 	dev = &intf->dev;
 
-	/* hdcap = kzalloc_obj(*hdcap, GFP_KERNEL); */
-	hdcap = kzalloc(sizeof(struct usb3hdcap), GFP_KERNEL);
+	hdcap = kzalloc_obj(*hdcap, GFP_KERNEL);
 	if (!hdcap)
 		return -ENOMEM;
 
@@ -996,9 +949,9 @@ static int usb3hdcap_probe(struct usb_interface *intf,
 	 */
 	v4l2_device_get(&hdcap->v4l2_dev);
 
+	is_xcapture = le16_to_cpu(hdcap->usb_dev->descriptor.idProduct) == XCAPTURE1_PID;
 	dev_info(dev, "%s USB 3.0 HD Video Capture Device",
-		le16_to_cpu(hdcap->usb_dev->descriptor.idProduct) == XCAPTURE1_PID ?
-		"Micomsoft XCAPTURE-1" : "StarTech USB3HDCAP");
+		 is_xcapture ? "Micomsoft XCAPTURE-1" : "StarTech USB3HDCAP");
 
 	return 0;
 

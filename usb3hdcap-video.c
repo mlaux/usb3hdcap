@@ -4,7 +4,6 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/usb.h>
 #include <linux/vmalloc.h>
@@ -71,7 +70,7 @@ static void deliver_frame(struct usb3hdcap *hdcap)
 	}
 
 	vb2_set_plane_payload(&buf->vb.vb2_buf, 0,
-		hdcap->bpl * hdcap->height);
+			      hdcap->bpl * hdcap->height);
 	buf->vb.vb2_buf.timestamp = ktime_get_ns();
 	if (hdcap->interlaced) {
 		buf->vb.field = hdcap->is_second_field ? V4L2_FIELD_BOTTOM : V4L2_FIELD_TOP;
@@ -121,10 +120,9 @@ static void process_video_line(struct usb3hdcap *hdcap, const u8 *video)
 			return;
 	}
 
-	vyuy_to_yuyv(
-		vb2_plane_vaddr(&hdcap->cur_buf->vb.vb2_buf, 0)
+	vyuy_to_yuyv(vb2_plane_vaddr(&hdcap->cur_buf->vb.vb2_buf, 0)
 			+ hdcap->frame_line * hdcap->bpl,
-		video, hdcap->bpl);
+		     video, hdcap->bpl);
 	hdcap->frame_line++;
 }
 
@@ -165,8 +163,7 @@ static void process_data(struct usb3hdcap *hdcap)
 			if (pos + MARKER_LEN + alen > hdcap->parse_len)
 				break;
 			hdcap->markers_found++;
-			usb3hdcap_audio_data(hdcap,
-				buf + pos + MARKER_LEN, alen);
+			usb3hdcap_audio_data(hdcap, buf + pos + MARKER_LEN, alen);
 			pos += MARKER_LEN + alen;
 		} else {
 			pos++;
@@ -357,7 +354,7 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 			0x11, 0x82, 0xff, 0x00,  0x12, 0x82, 0xff, 0x00,
 		};
 		ret = vendor_out(hdcap, REQ_STREAM, 0x0032, 1,
-			stream_payload, sizeof(stream_payload));
+				 stream_payload, sizeof(stream_payload));
 	} else if (hdcap->input == INPUT_COMPONENT) {
 		/* Component: monitor MST3367 ADC registers */
 		u8 stream_payload[] = {
@@ -367,7 +364,7 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 			0x11, 0x82, 0xff, 0x00,  0x12, 0x82, 0xff, 0x00,
 		};
 		ret = vendor_out(hdcap, REQ_STREAM, 0x0032, 1,
-			stream_payload, sizeof(stream_payload));
+				 stream_payload, sizeof(stream_payload));
 	} else {
 		u8 stream_payload[] = {
 			0x01, 0x40, 0xe9, 0x88,
@@ -376,7 +373,7 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 		};
 		v4l2_ctrl_handler_setup(&hdcap->ctrl);
 		ret = vendor_out(hdcap, REQ_STREAM, 0x0032, 1,
-			stream_payload, sizeof(stream_payload));
+				 stream_payload, sizeof(stream_payload));
 	}
 
 	if (ret < 0) {
@@ -404,7 +401,7 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 
 	/* Compute ISO packet size from SS endpoint companion descriptor */
 	ep = usb_pipe_endpoint(hdcap->usb_dev,
-		usb_rcvisocpipe(hdcap->usb_dev, EP_VIDEO));
+			       usb_rcvisocpipe(hdcap->usb_dev, EP_VIDEO));
 	if (!ep) {
 		dev_err(hdcap->dev, "ISO endpoint 0x%02x not found\n",
 			EP_VIDEO);
@@ -441,11 +438,8 @@ fail:
 /* vb2 ops                                                            */
 /* ------------------------------------------------------------------ */
 
-static int usb3hdcap_queue_setup(
-	struct vb2_queue *vq,
-	unsigned int *nbuffers,
-	unsigned int *nplanes,
-	unsigned int sizes[],
+static int usb3hdcap_queue_setup(struct vb2_queue *vq, unsigned int *nbuffers,
+				 unsigned int *nplanes, unsigned int sizes[],
 	struct device *alloc_devs[])
 {
 	struct usb3hdcap *hdcap = vb2_get_drv_priv(vq);
@@ -453,7 +447,7 @@ static int usb3hdcap_queue_setup(
 
 	if (*nplanes) {
 		dev_info(hdcap->dev, "queue_setup: recheck sizes[0]=%u vs %u\n",
-			sizes[0], img_size);
+			 sizes[0], img_size);
 		return sizes[0] < img_size ? -EINVAL : 0;
 	}
 	*nplanes = 1;
@@ -508,8 +502,4 @@ const struct vb2_ops usb3hdcap_vb2_ops = {
 	.buf_queue = usb3hdcap_buf_queue,
 	.start_streaming = usb3hdcap_start_streaming,
 	.stop_streaming = usb3hdcap_stop_streaming,
-#if KERNEL_VERSION(6, 13, 0) >= LINUX_VERSION_CODE
-	.wait_prepare = vb2_ops_wait_prepare,
-	.wait_finish = vb2_ops_wait_finish,
-#endif
 };
