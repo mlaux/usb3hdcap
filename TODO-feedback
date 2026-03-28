@@ -1,0 +1,19 @@
+Patch version 2 with automated stuff - no human feedback yet:
+
+* the rest of the checkpatch warnings (I guess `check`s actually matter, not
+  just `warning`s. Somehow `checks` weren't even reported on my initial runs)
+
+* how did Intel find this? automated scanning of all patches even non-merged? "mlaux authored and intel-lab-lkp committed 20 hours ago"
+versioncheck warnings: (new ones prefixed by >>)
+   INFO PATH=/opt/cross/rustc-1.88.0-bindgen-0.72.1/cargo/bin:/opt/cross/clang-20/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+   /usr/bin/timeout -k 100 3h /usr/bin/make KCFLAGS=\ -fno-crash-diagnostics\ -Wno-error=return-type\ -Wreturn-type\ -funsigned-char\ -Wundef\ -falign-functions=64 W=1 --keep-going LLVM=1 -j32 ARCH=x86_64 versioncheck
+   find ./* \( -name SCCS -o -name BitKeeper -o -name .svn -o -name CVS -o -name .pc -o -name .hg -o -name .git \) -prune -o \
+   	-name '*.[hcS]' -type f -print | sort \
+   	| xargs perl -w ./scripts/checkversion.pl
+>> ./drivers/staging/media/usb3hdcap/usb3hdcap-video.c: 7 linux/version.h not needed.
+url:    https://github.com/intel-lab-lkp/linux/commits/Matthew-Laux/staging-media-add-driver-for-StarTech-USB3HDCAP/20260327-130544
+
+* remove useless control for HDMI CSC matrix now that it's autodetected
+* update main TODO file with current state
+* remove mchehab and add hverkuil as a reviewer? not sure on the process... "V4L2 drivers and core V4L2 frameworks:
+Hans Verkuil <hverkuil@kernel.org>" https://docs.kernel.org/driver-api/media/maintainer-entry-profile.html
