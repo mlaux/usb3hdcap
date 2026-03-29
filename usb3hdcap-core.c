@@ -456,7 +456,7 @@ static const struct v4l2_dv_timings_cap usb3hdcap_timings_cap = {
 	},
 };
 
-const struct v4l2_dv_timings all_supported_dv_timings[] = {
+static const struct v4l2_dv_timings all_supported_dv_timings[] = {
 	/* component only */
 	V4L2_DV_BT_CEA_720X480I59_94,
 	V4L2_DV_BT_CEA_720X576I50,
