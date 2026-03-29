@@ -15,5 +15,10 @@ url:    https://github.com/intel-lab-lkp/linux/commits/Matthew-Laux/staging-medi
 
 * remove useless control for HDMI CSC matrix now that it's autodetected
 * update main TODO file with current state
-* remove mchehab and add hverkuil as a reviewer? not sure on the process... "V4L2 drivers and core V4L2 frameworks:
-Hans Verkuil <hverkuil@kernel.org>" https://docs.kernel.org/driver-api/media/maintainer-entry-profile.html
+* add Hans Verkuil <hverkuil@kernel.org>" https://docs.kernel.org/driver-api/media/maintainer-entry-profile.html as additional reviewer
+
+For version 3:
+
+drivers/staging/media/usb3hdcap/usb3hdcap-core.c:459:30: warning: symbol 'all_supported_dv_timings' was not declared. Should it be static?
+drivers/staging/media/usb3hdcap/usb3hdcap-hdmi.c:165:53: warning: cast truncates bits from constant value (ffffff5d becomes 5d)
+drivers/staging/media/usb3hdcap/usb3hdcap-hdmi.c:175:53: warning: cast truncates bits from constant value (ffffff5e becomes 5e)

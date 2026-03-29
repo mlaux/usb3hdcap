@@ -162,7 +162,7 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1d, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1e, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1f, 0x00);
-	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x25, (u8)~0xa2, 0xa2);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x25, 0xff ^ 0xa2, 0xa2);
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x07, ~0x04, 0x04);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x17, 0xc0);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x19, 0xff);
@@ -172,7 +172,7 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x21, ~0x03, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x22, 0x26);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x27, 0x00);
-	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x2e, (u8)~0xa1, 0xa1);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x2e, 0xff ^ 0xa1, 0xa1);
 
 	mst_bank(hdcap, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xab, 0x15); /* COLOR.RANGE */
