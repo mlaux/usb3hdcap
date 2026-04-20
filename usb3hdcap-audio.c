@@ -126,16 +126,16 @@ void usb3hdcap_audio_data(struct usb3hdcap *hdcap, const u8 *data, int len)
 	if (!substream)
 		return;
 
+	snd_pcm_stream_lock_irqsave(substream, flags);
+
 	runtime = substream->runtime;
 	if (!runtime || !runtime->dma_area)
-		return;
+		goto out;
 
 	frame_bytes = runtime->frame_bits >> 3;
 	nframes = len / frame_bytes;
 	if (!nframes)
-		return;
-
-	snd_pcm_stream_lock_irqsave(substream, flags);
+		goto out;
 
 	buffer_pos = hdcap->snd_buffer_pos;
 	period_pos = hdcap->snd_period_pos;
@@ -165,6 +165,7 @@ void usb3hdcap_audio_data(struct usb3hdcap *hdcap, const u8 *data, int len)
 	hdcap->snd_buffer_pos = buffer_pos;
 	hdcap->snd_period_pos = period_pos;
 
+out:
 	snd_pcm_stream_unlock_irqrestore(substream, flags);
 
 	if (period_elapsed)
@@ -246,6 +247,13 @@ int usb3hdcap_cs53l21_init(struct usb3hdcap *hdcap)
 /* ALSA card init / teardown                                          */
 /* ------------------------------------------------------------------ */
 
+static void usb3hdcap_snd_free(struct snd_card *card)
+{
+	struct usb3hdcap *hdcap = card->private_data;
+
+	v4l2_device_put(&hdcap->v4l2_dev);
+}
+
 int usb3hdcap_audio_init(struct usb3hdcap *hdcap)
 {
 	int ret;
@@ -266,6 +274,9 @@ int usb3hdcap_audio_init(struct usb3hdcap *hdcap)
 		 hdcap->usb_dev->bus->busnum, hdcap->usb_dev->devnum);
 
 	hdcap->snd = card;
+	card->private_data = hdcap;
+	card->private_free = usb3hdcap_snd_free;
+	v4l2_device_get(&hdcap->v4l2_dev);
 
 	ret = snd_pcm_new(card, "USB3HDCAP Audio", 0, 0, 1, &pcm);
 	if (ret < 0)

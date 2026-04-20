@@ -97,8 +97,14 @@ static int vendor_in(struct usb3hdcap *hdcap, u8 request, u16 value, u16 index,
 			      USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 			      value, index, buf, len, 1000);
 
+	if (ret >= 0 && ret < len) {
+		dev_err(hdcap->dev,
+			"%s 0x%02x val=0x%04x idx=0x%04x: short read %d/%d\n",
+			__func__, request, value, index, ret, len);
+		ret = -EIO;
+	}
 	if (ret >= 0)
-		memcpy(data, buf, min_t(int, ret, len));
+		memcpy(data, buf, len);
 
 	kfree(buf);
 	return ret;
@@ -125,17 +131,27 @@ static bool mcu_use_gateway(u8 addr)
 static int mcu_i2c_write(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 val)
 {
 	u8 buf[3];
+	u16 wvalue;
+	int len;
+	int ret;
 
 	if (mcu_use_gateway(addr)) {
 		buf[0] = addr;
 		buf[1] = reg;
 		buf[2] = val;
-		return vendor_out(hdcap, REQ_I2C, 0x5066, 0, buf, 3);
+		wvalue = 0x5066;
+		len = 3;
+	} else {
+		buf[0] = reg;
+		buf[1] = val;
+		wvalue = addr | 0x5000;
+		len = 2;
 	}
 
-	buf[0] = reg;
-	buf[1] = val;
-	return vendor_out(hdcap, REQ_I2C, addr | 0x5000, 0, buf, 2);
+	mutex_lock(&hdcap->mcu_lock);
+	ret = vendor_out(hdcap, REQ_I2C, wvalue, 0, buf, len);
+	mutex_unlock(&hdcap->mcu_lock);
+	return ret;
 }
 
 static int mcu_i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg)
@@ -144,20 +160,25 @@ static int mcu_i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg)
 	u8 val;
 	int ret;
 
+	mutex_lock(&hdcap->mcu_lock);
+
 	/* send target addr, rx length, and register */
 	ret = vendor_out(hdcap, REQ_I2C, 0x5066, 0, tx, 3);
 	if (ret < 0)
-		return ret;
+		goto out;
 
 	/* Retrieve the result */
 	ret = vendor_in(hdcap, REQ_I2C, 0x5066, 0, &val, 1);
 	if (ret < 0) {
 		dev_err(hdcap->dev, "%s 0x%02x reg 0x%02x: %d\n",
 			__func__, addr, reg, ret);
-		return ret;
+		goto out;
 	}
+	ret = val;
 
-	return val;
+out:
+	mutex_unlock(&hdcap->mcu_lock);
+	return ret;
 }
 
 int u3hc_i2c_write(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 val)
@@ -433,6 +454,9 @@ static int usb3hdcap_s_std(struct file *file, void *priv, v4l2_std_id norm)
 	if (!(norm & USB3HDCAP_V4L2_STDS))
 		return -EINVAL;
 
+	if (vb2_is_busy(&hdcap->vb2q))
+		return -EBUSY;
+
 	hdcap->requested_std = norm;
 	return 0;
 }
@@ -500,6 +524,9 @@ static int usb3hdcap_s_dv_timings(struct file *file, void *priv,
 
 	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
 		return -ENODATA;
+
+	if (vb2_is_busy(&hdcap->vb2q))
+		return -EBUSY;
 
 	hdcap->requested_timings = *timings;
 	hdcap->requested_timings_present = 1;
@@ -811,6 +838,7 @@ static int video_init(struct usb3hdcap *hdcap)
 
 	mutex_init(&hdcap->v4l2_lock);
 	mutex_init(&hdcap->vb2q_lock);
+	mutex_init(&hdcap->mcu_lock);
 	spin_lock_init(&hdcap->buflock);
 	INIT_LIST_HEAD(&hdcap->bufs);
 

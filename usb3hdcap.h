@@ -150,6 +150,8 @@ struct usb3hdcap {
 	struct mutex v4l2_lock;
 	/* protects videobuf2 queue operations */
 	struct mutex vb2q_lock;
+	/* serializes write then read for XCAPTURE-1 */
+	struct mutex mcu_lock;
 
 	/* buffer list */
 	spinlock_t buflock;

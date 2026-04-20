@@ -260,7 +260,8 @@ static struct urb *usb3hdcap_alloc_urb(struct usb3hdcap *hdcap)
 	return urb;
 }
 
-static void usb3hdcap_stop(struct usb3hdcap *hdcap)
+static void usb3hdcap_stop(struct usb3hdcap *hdcap,
+			   enum vb2_buffer_state buf_state)
 {
 	int k;
 	unsigned long flags;
@@ -284,8 +285,7 @@ static void usb3hdcap_stop(struct usb3hdcap *hdcap)
 
 	/* Return any in-progress buffer */
 	if (hdcap->cur_buf) {
-		vb2_buffer_done(&hdcap->cur_buf->vb.vb2_buf,
-				VB2_BUF_STATE_ERROR);
+		vb2_buffer_done(&hdcap->cur_buf->vb.vb2_buf, buf_state);
 		hdcap->cur_buf = NULL;
 	}
 
@@ -293,8 +293,8 @@ static void usb3hdcap_stop(struct usb3hdcap *hdcap)
 	while (!list_empty(&hdcap->bufs)) {
 		struct hdcap_buf *buf = list_first_entry(&hdcap->bufs,
 						struct hdcap_buf, list);
-		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
 		list_del(&buf->list);
+		vb2_buffer_done(&buf->vb.vb2_buf, buf_state);
 	}
 	spin_unlock_irqrestore(&hdcap->buflock, flags);
 
@@ -312,14 +312,16 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 		ret = usb3hdcap_hw_init(hdcap);
 		if (ret < 0) {
 			dev_err(hdcap->dev, "open: hw_init failed: %d\n", ret);
-			return ret;
+			goto fail;
 		}
 		hdcap->hw_inited = 1;
 	}
 
 	hdcap->parse_buf = vzalloc(PARSE_BUF_SIZE);
-	if (!hdcap->parse_buf)
-		return -ENOMEM;
+	if (!hdcap->parse_buf) {
+		ret = -ENOMEM;
+		goto fail;
+	}
 	hdcap->parse_len = 0;
 	hdcap->frame_line = 0;
 	hdcap->synced = 0;
@@ -376,11 +378,8 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 				 stream_payload, sizeof(stream_payload));
 	}
 
-	if (ret < 0) {
-		vfree(hdcap->parse_buf);
-		hdcap->parse_buf = NULL;
-		return ret;
-	}
+	if (ret < 0)
+		goto fail;
 
 	/*
 	 * Select alt setting based on bandwidth:
@@ -394,9 +393,7 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 	if (ret < 0) {
 		dev_err(hdcap->dev, "%s: usb_set_interface failed: %d\n",
 			__func__, ret);
-		vfree(hdcap->parse_buf);
-		hdcap->parse_buf = NULL;
-		return ret;
+		goto fail;
 	}
 
 	/* Compute ISO packet size from SS endpoint companion descriptor */
@@ -405,7 +402,8 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 	if (!ep) {
 		dev_err(hdcap->dev, "ISO endpoint 0x%02x not found\n",
 			EP_VIDEO);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto fail;
 	}
 
 	maxp = usb_endpoint_maxp(&ep->desc);
@@ -430,7 +428,8 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 	return 0;
 
 fail:
-	usb3hdcap_stop(hdcap);
+	/* vb2 requires queued buffers to be returned as QUEUED on failure */
+	usb3hdcap_stop(hdcap, VB2_BUF_STATE_QUEUED);
 	return ret;
 }
 
@@ -494,7 +493,7 @@ static void usb3hdcap_stop_streaming(struct vb2_queue *vq)
 	struct usb3hdcap *hdcap = vb2_get_drv_priv(vq);
 
 	if (hdcap->usb_dev)
-		usb3hdcap_stop(hdcap);
+		usb3hdcap_stop(hdcap, VB2_BUF_STATE_ERROR);
 }
 
 const struct vb2_ops usb3hdcap_vb2_ops = {
