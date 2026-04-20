@@ -420,7 +420,11 @@ static int usb3hdcap_fmt_vid_cap(struct file *file, void *priv,
 	f->fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
 	f->fmt.pix.field = interlaced ? V4L2_FIELD_ALTERNATE : V4L2_FIELD_NONE;
 	f->fmt.pix.bytesperline = width * 2;
-	f->fmt.pix.sizeimage = width * 2 * height;
+	/* always size SD buffers for PAL */
+	if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)
+		f->fmt.pix.sizeimage = SD_WIDTH * 2 * (PAL_HEIGHT / 2);
+	else
+		f->fmt.pix.sizeimage = f->fmt.pix.bytesperline * height;
 	f->fmt.pix.colorspace = (hdcap->input == INPUT_HDMI) ?
 		V4L2_COLORSPACE_REC709 : V4L2_COLORSPACE_SMPTE170M;
 
@@ -605,8 +609,6 @@ static int usb3hdcap_s_input(struct file *file, void *priv, unsigned int i)
 
 	hdcap->input = i;
 
-	usb3hdcap_activate_ctrls(hdcap, i);
-
 	ret = usb3hdcap_hw_init(hdcap);
 	if (ret < 0) {
 		hdcap->input = old_input;
@@ -614,8 +616,8 @@ static int usb3hdcap_s_input(struct file *file, void *priv, unsigned int i)
 		return ret;
 	}
 
-	hdcap->bpl = hdcap->width * 2;
 	hdcap->hw_inited = 1;
+	usb3hdcap_activate_ctrls(hdcap, i);
 
 	if (i == INPUT_COMPOSITE || i == INPUT_SVIDEO)
 		hdcap->video_dev.tvnorms = USB3HDCAP_V4L2_STDS;

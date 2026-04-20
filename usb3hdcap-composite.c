@@ -60,6 +60,7 @@ static void usb3hdcap_detect_size(struct usb3hdcap *hdcap)
 
 	hdcap->width = SD_WIDTH;
 	hdcap->height = half_h;
+	hdcap->bpl = hdcap->width * 2;
 
 	status = u3hc_i2c_read(hdcap, ADDR_TW9900, TW9900_CSTATUS_II);
 	if (status >= 0 && (status & TW9900_NINTL)) {

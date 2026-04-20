@@ -442,7 +442,13 @@ static int usb3hdcap_queue_setup(struct vb2_queue *vq, unsigned int *nbuffers,
 	struct device *alloc_devs[])
 {
 	struct usb3hdcap *hdcap = vb2_get_drv_priv(vq);
-	unsigned int img_size = hdcap->bpl * hdcap->height;
+	unsigned int img_size;
+
+	/* worst case for composite/svideo is 720x288x2 */
+	if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)
+		img_size = SD_WIDTH * 2 * (PAL_HEIGHT / 2);
+	else /* hdmi/component always have a real detected size */
+		img_size = hdcap->bpl * hdcap->height;
 
 	if (*nplanes) {
 		dev_info(hdcap->dev, "queue_setup: recheck sizes[0]=%u vs %u\n",
