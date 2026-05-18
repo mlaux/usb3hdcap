@@ -80,6 +80,7 @@ static const struct hdmi_std hdmi_stds[] = {
 	{  848,  868,  520,  530,  720, V4L2_DV_BT_CEA_720X480P59_94 },
 	{  854,  874,  620,  630,  720, V4L2_DV_BT_CEA_720X576P50 },
 	{ 2960, 2980,  745,  755, 1280, V4L2_DV_BT_CEA_1280X720P50 },
+  { 1640, 1660,  745,  755, 1280, V4L2_DV_BT_CEA_1280X720P60 },
 	{ 2465, 2485,  745,  755, 1280, V4L2_DV_BT_CEA_1280X720P60 },
 	/*
 	 * not sure about this one. it matches the timings for 30, but my laptop
