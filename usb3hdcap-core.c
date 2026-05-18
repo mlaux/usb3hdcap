@@ -28,6 +28,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
@@ -35,6 +36,7 @@
 #include <linux/kref.h>
 #include <linux/uaccess.h>
 #include <linux/usb.h>
+#include <linux/vmalloc.h>
 #include <linux/mutex.h>
 #include <media/v4l2-common.h>
 #include <linux/v4l2-dv-timings.h>
@@ -183,8 +185,12 @@ out:
 
 int u3hc_i2c_write(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 val)
 {
-	if (hdcap->has_mcu)
+	if (hdcap->has_mcu) {
+		if (addr == ADDR_MST3367 && reg != 0x00)
+			mcu_i2c_write(hdcap, ADDR_MST3367, 0x00,
+				       hdcap->mst_current_bank);
 		return mcu_i2c_write(hdcap, addr, reg, val);
+	}
 	return vendor_out(hdcap, REQ_I2C, addr, reg, &val, 1);
 }
 
@@ -824,6 +830,32 @@ static const struct v4l2_file_operations usb3hdcap_fops = {
 	.poll = vb2_fop_poll,
 };
 
+/* ------------------------------------------------------------------ */
+/* debugfs stream dump                                                */
+/* ------------------------------------------------------------------ */
+
+static ssize_t stream_dump_read(struct file *file, char __user *buf,
+				size_t count, loff_t *ppos)
+{
+	struct usb3hdcap *hdcap = file->private_data;
+
+	return simple_read_from_buffer(buf, count, ppos,
+				       hdcap->dump_buf, hdcap->dump_len);
+}
+
+static int stream_dump_open(struct inode *inode, struct file *file)
+{
+	file->private_data = inode->i_private;
+	return 0;
+}
+
+static const struct file_operations stream_dump_fops = {
+	.owner = THIS_MODULE,
+	.open = stream_dump_open,
+	.read = stream_dump_read,
+	.llseek = default_llseek,
+};
+
 static void usb3hdcap_release(struct v4l2_device *v4l2_dev)
 {
 	struct usb3hdcap *hdcap = container_of(v4l2_dev,
@@ -831,6 +863,7 @@ static void usb3hdcap_release(struct v4l2_device *v4l2_dev)
 
 	v4l2_device_unregister(&hdcap->v4l2_dev);
 	v4l2_ctrl_handler_free(&hdcap->ctrl);
+	vfree(hdcap->dump_buf);
 	kfree(hdcap);
 }
 
@@ -972,6 +1005,17 @@ static int usb3hdcap_probe(struct usb_interface *intf,
 	if (ret < 0)
 		dev_warn(dev, "audio init failed: %d (continuing without audio)\n", ret);
 
+	hdcap->dump_buf = vzalloc(STREAM_DUMP_SIZE);
+	if (hdcap->dump_buf) {
+		char debugfs_name[64];
+
+		snprintf(debugfs_name, sizeof(debugfs_name), "usb3hdcap-%s",
+			 video_device_node_name(&hdcap->video_dev));
+		hdcap->debugfs_dir = debugfs_create_dir(debugfs_name, NULL);
+		debugfs_create_file("stream_dump", 0444, hdcap->debugfs_dir,
+				    hdcap, &stream_dump_fops);
+	}
+
 	/*
 	 * Take an extra ref so that disconnect's v4l2_device_put doesn't
 	 * immediately trigger usb3hdcap_release before cleanup is done - based on
@@ -1001,6 +1045,7 @@ static void usb3hdcap_disconnect(struct usb_interface *intf)
 	if (!hdcap)
 		return;
 
+	debugfs_remove_recursive(hdcap->debugfs_dir);
 	usb3hdcap_audio_free(hdcap);
 	vb2_video_unregister_device(&hdcap->video_dev);
 	v4l2_device_disconnect(&hdcap->v4l2_dev);

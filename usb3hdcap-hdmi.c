@@ -175,11 +175,19 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x2e, 0xff ^ 0xa1, 0xa1);
 
 	mst_bank(hdcap, 0x00);
+
+	if (hdcap->has_mcu) {
+		u3hc_i2c_rmw(hdcap, ADDR_CPLD, 0x01, 0xff, 0x03);
+		u3hc_i2c_write(hdcap, ADDR_CPLD, 0x11, 0xfc);
+	}
+
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xb7, 0xff, 0x02);
+
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xab, 0x15); /* COLOR.RANGE */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xac, 0x15); /* COLOR.RANGE */
 
 	/* RxHdcpReset */
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x10); /* HDCP.RESET */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x10);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb8, 0x00);
 
 	/* RxHdmiReset */
@@ -190,10 +198,16 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 	/* RxSwitchSource: 0x81 = HDMI TMDS.A */
 	mst_bank(hdcap, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x51, 0x81);
-	/* RxTmdsHotPlug: link on */
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xb7, 0x00);
 
-	/* RxHdmiInit */
+	if (hdcap->has_mcu) {
+		u3hc_i2c_rmw(hdcap, ADDR_CPLD, 0x01, 0xfd, 0x01);
+		u3hc_i2c_write(hdcap, ADDR_CPLD, 0x11, 0xfc);
+	}
+
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xb7, 0xfd, 0x00);
+	msleep(200);
+
+	/* FUN_00016640: RxHdmiInit / BT.656 output enable */
 	mst_bank(hdcap, 0x02);
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x01, 0x0f, 0x60);
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x04, 0xff, 0x01);
@@ -205,27 +219,6 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xac, 0xff, 0x80);
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xce, 0xff, 0x80);
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xcf, 0xfa, 0x02);
-
-	/*
-	 * 8c28 is "CustomCompanyEndoCamProperty" (0 in my registry)
-	 * 7674 is "CustomAnalogVideoInputBandwidthProperty" (1 on my machine)
-	 * if (*(int *)(param_1 + 0x8c28) == 0) {
-	 *   uVar1 = *(uint *)(param_1 + 0x7674);
-	 *   local_18 = 0x3040006;
-	 *   uVar2 = (ulonglong)uVar1 / 6;
-	 *   local_14 = 0x107;
-	 *   bVar5 = read_mst(param_1,CONCAT71((int7)(uVar2 >> 8),0x80),0xd0);
-	 *   bVar4 = read_mst(param_1,0x80,0xcf);
-	 *   bVar3 = *(byte *)((longlong)&local_18 + (ulonglong)(uVar1
-	 *                 + (int)uVar2 * -6));
-	 *   bVar4 = bVar3 << 7 | bVar4 & 0x7f;
-	 *   bVar5 = (bVar3 >> 1 ^ bVar5) & 3 ^ bVar5;
-	 * }
-	 *
-	 * ... which has this effect:
-	 */
-	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xd0, 0xfc, 0x00);
-	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xcf, 0x7f, 0x00);
 
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x00, 0x7f, 0x00);
 	mst_bank(hdcap, 0x00);
@@ -278,7 +271,7 @@ static void cpld_init(struct usb3hdcap *hdcap, u8 mux_val)
 		msleep(20);
 	}
 
-	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x01, 0x02);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x01, hdcap->has_mcu ? 0x03 : 0x02);
 	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x11, 0xfc);
 }
 
@@ -418,65 +411,89 @@ static const struct v4l2_dv_timings *match_hdmi_timing(int htotal, int vtotal,
 static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 {
 	int k, status;
+	int prev_htotal = -1, prev_vtotal = -1, prev_hactive = -1;
+	int stable_count = 0;
 
 	vendor_out(hdcap, REQ_STREAM, 0x0000, 0, NULL, 0);
 
 	for (k = 0; k < 100; k++) {
+		int htotal, vtotal, hactive;
+		const struct v4l2_dv_timings *std;
+
+		msleep(100);
+
 		mst_bank(hdcap, 0x00);
 		status = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x55);
-		if (status < 0) {
-			msleep(100);
+		if (status < 0)
+			continue;
+
+		if (!(status & 0x3c)) {
+			/* Not locked yet, ENABLE AUTO POSITION */
+			u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x80);
+			if (k % 10 == 0)
+				dev_info(hdcap->dev,
+					 "HDMI signal poll[%d]: lock=0x%02x (no signal)\n",
+					 k, status);
+			stable_count = 0;
 			continue;
 		}
 
-		if (k % 10 == 0)
+		htotal = (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x6a) << 8 |
+			  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x6b)) & 0xfff;
+		vtotal = (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5b) << 8 |
+			  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5c)) & 0x7ff;
+
+		mst_bank(hdcap, 0x02);
+		hactive = (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x29) << 8 |
+			   u3hc_i2c_read(hdcap, ADDR_MST3367, 0x28)) & 0x1fff;
+
+		if (k % 5 == 0)
 			dev_info(hdcap->dev,
-				 "HDMI signal poll[%d]: lock=0x%02x\n",
-				 k, status);
+				 "HDMI poll[%d]: lock=0x%02x ht=%d vt=%d ha=%d stable=%d\n",
+				 k, status, htotal, vtotal, hactive, stable_count);
 
-		if (status & 0x3c) {
-			const struct v4l2_dv_timings *std;
-			int htotal, vtotal, hactive;
-
-			htotal = (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x6a) << 8 |
-				  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x6b)) & 0xfff;
-			vtotal = (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5b) << 8 |
-				  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5c)) & 0x7ff;
-
-			mst_bank(hdcap, 0x02);
-			hactive = (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x29) << 8 |
-				   u3hc_i2c_read(hdcap, ADDR_MST3367, 0x28)) & 0x1fff;
-
-			dev_info(hdcap->dev,
-				 "HDMI locked: htotal=%d vtotal=%d hactive=%d\n",
-				 htotal, vtotal, hactive);
-
-			std = match_hdmi_timing(htotal, vtotal, hactive);
-			if (!std) {
-				dev_err(hdcap->dev,
-					"unsupported HDMI timing: htotal=%d vtotal=%d hactive=%d\n",
-					htotal, vtotal, hactive);
-				return -ERANGE;
-			}
-			hdcap->detected_timings = *std;
-			hdcap->detected_timings_present = 1;
-			hdcap->std = 0; /* no SD standard */
-			hdcap->width = std->bt.width;
-			hdcap->interlaced = std->bt.interlaced;
-			hdcap->height = std->bt.interlaced
-				? std->bt.height / 2 : std->bt.height;
-			hdcap->bpl = hdcap->width * 2;
-
-			/* DISABLE AUTO POSITION */
-			mst_bank(hdcap, 0x00);
-			u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x00);
-
-			return 0;
+		/*
+		 * Require non-zero timings AND two consecutive identical
+		 * readings before accepting
+		 */
+		if (htotal == 0 || vtotal == 0 || hactive == 0 ||
+		    htotal != prev_htotal || vtotal != prev_vtotal ||
+		    hactive != prev_hactive) {
+			prev_htotal = htotal;
+			prev_vtotal = vtotal;
+			prev_hactive = hactive;
+			stable_count = 0;
+			continue;
 		}
 
-		/* Not locked yet, ENABLE AUTO POSITION */
-		u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x80);
-		msleep(100);
+		if (++stable_count < 2)
+			continue;
+
+		dev_info(hdcap->dev,
+				"HDMI locked: htotal=%d vtotal=%d hactive=%d\n",
+				htotal, vtotal, hactive);
+
+		std = match_hdmi_timing(htotal, vtotal, hactive);
+		if (!std) {
+			dev_err(hdcap->dev,
+				"unsupported HDMI timing: htotal=%d vtotal=%d hactive=%d\n",
+				htotal, vtotal, hactive);
+			return -ERANGE;
+		}
+		hdcap->detected_timings = *std;
+		hdcap->detected_timings_present = 1;
+		hdcap->std = 0; /* no SD standard */
+		hdcap->width = std->bt.width;
+		hdcap->interlaced = std->bt.interlaced;
+		hdcap->height = std->bt.interlaced
+			? std->bt.height / 2 : std->bt.height;
+		hdcap->bpl = hdcap->width * 2;
+
+		/* DISABLE AUTO POSITION */
+		mst_bank(hdcap, 0x00);
+		u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x00);
+
+		return 0;
 	}
 
 	dev_err(hdcap->dev, "No HDMI signal lock after 10s\n");
@@ -717,25 +734,19 @@ int usb3hdcap_hdmi_init(struct usb3hdcap *hdcap)
 
 	hdcap->mst_current_bank = -1;
 
-	mst3367_config(hdcap);
-
 	/* TW9900 power-down */
 	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x06, 0x0e);
 	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x1a, 0x40);
 
 	/* CPLD init with HDMI input mux */
 	cpld_init(hdcap, 0x02);
-
-	u3hc_i2c_read(hdcap, ADDR_CPLD, 0x20);
-	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
-
-	/* probably not needed */
-	u3hc_i2c_read(hdcap, ADDR_CPLD, 0x20);
-	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
+	mst3367_config(hdcap);
 
 	ret = hdmi_poll_signal(hdcap);
 	if (ret < 0)
 		return ret;
+
+	mst3367_write_csc(hdcap);
 
 	v4l2_ctrl_handler_setup(&hdcap->ctrl);
 
@@ -755,14 +766,14 @@ int usb3hdcap_component_init(struct usb3hdcap *hdcap)
 
 	hdcap->mst_current_bank = -1;
 
-	mst3367_config(hdcap);
-
 	/* TW9900 power-down */
 	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x06, 0x0e);
 	u3hc_i2c_write(hdcap, ADDR_TW9900, 0x1a, 0x40);
 
 	/* CPLD init with component input mux */
 	cpld_init(hdcap, 0x80);
+
+	mst3367_config(hdcap);
 
 	/* RxSwitchSource: 0x21 = component ADC (YPbPr) */
 	mst_bank(hdcap, 0x00);
@@ -791,6 +802,7 @@ int usb3hdcap_component_init(struct usb3hdcap *hdcap)
 	u3hc_i2c_rmw(hdcap, ADDR_CPLD, 0x00, 0xff, 0x02);
 
 	component_write_scaler(hdcap, mode);
+	mst3367_write_csc(hdcap);
 
 	v4l2_ctrl_handler_setup(&hdcap->ctrl);
 

@@ -211,6 +211,12 @@ static void usb3hdcap_iso_cb(struct urb *urb)
 		if (status != 0 || len == 0)
 			continue;
 
+		if (hdcap->dump_buf &&
+		    hdcap->dump_len + len <= STREAM_DUMP_SIZE) {
+			memcpy(hdcap->dump_buf + hdcap->dump_len, data, len);
+			hdcap->dump_len += len;
+		}
+
 		if (hdcap->parse_len + len > PARSE_BUF_SIZE) {
 			hdcap->parse_len = 0;
 			continue;
@@ -323,6 +329,7 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 		goto fail;
 	}
 	hdcap->parse_len = 0;
+	hdcap->dump_len = 0;
 	hdcap->frame_line = 0;
 	hdcap->synced = 0;
 	hdcap->was_blanking = 0;
