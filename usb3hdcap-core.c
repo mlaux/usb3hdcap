@@ -655,12 +655,7 @@ static void fill_timeperframe(struct usb3hdcap *hdcap, struct v4l2_fract *tf)
 	 * using the frame rate here even for interlaced, spec isn't super
 	 * clear on what to do, but adv7180.c does it this way
 	 */
-	/*
-	 * Test detected_timings_present rather than detected_timings.type:
-	 * V4L2_DV_BT_656_1120 is 0, which is the only type this driver ever
-	 * sets, so the check was always false and every HDMI/component mode
-	 * fell through to the SD fallback below.
-	 */
+
 	if (hdcap->detected_timings_present) {
 		const struct v4l2_bt_timings *bt = &hdcap->detected_timings.bt;
 		u32 htotal = V4L2_DV_BT_FRAME_WIDTH(bt);
