@@ -655,7 +655,8 @@ static void fill_timeperframe(struct usb3hdcap *hdcap, struct v4l2_fract *tf)
 	 * using the frame rate here even for interlaced, spec isn't super
 	 * clear on what to do, but adv7180.c does it this way
 	 */
-	if (hdcap->detected_timings.type) {
+
+	if (hdcap->detected_timings_present) {
 		const struct v4l2_bt_timings *bt = &hdcap->detected_timings.bt;
 		u32 htotal = V4L2_DV_BT_FRAME_WIDTH(bt);
 		u32 vtotal = V4L2_DV_BT_FRAME_HEIGHT(bt);
