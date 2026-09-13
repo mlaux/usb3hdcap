@@ -420,6 +420,10 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 
 	vendor_out(hdcap, REQ_STREAM, 0x0000, 0, NULL, 0);
 
+	mst_bank(hdcap, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x80);
+	msleep(100);
+
 	for (k = 0; k < 100; k++) {
 		int htotal, vtotal, hactive;
 		const struct v4l2_dv_timings *std;
