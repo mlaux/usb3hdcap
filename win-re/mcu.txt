@@ -1,0 +1,53 @@
+in send_reset_vendors:
+
+  cVar3 = i2c_read(param_1,0x98,0x3b,0);
+  if (cVar3 != '\0') {
+    uVar5 = *(uint *)(param_1 + 0x6840);
+    if ((uVar5 == 2) || (uVar5 == 3)) {
+      local_res8[0] = -0x80;
+      i2c_write(param_1,0x98,0x3b,local_res8,1);
+      uVar5 = *(uint *)(param_1 + 0x6840);
+    }
+    if (uVar5 < 2) {
+      local_res8[0] = '\x02';
+      i2c_write(param_1,0x98,0x3b,local_res8,1);
+    }
+  }
+  local_res8[0] = '\x05';
+  i2c_write(param_1,0x98,0x20,local_res8,1);
+  cVar3 = FUN_140226fc4(param_1);
+  local_res8[0] = '\x01';
+  i2c_write(param_1,0x98,0,local_res8,1);
+  local_res8[0] = (-(cVar3 != '\0') & 0xfeU) - 2;
+  i2c_write(param_1,0x98,0x10,local_res8,1);
+
+in signal_monitoring_thread:
+
+              cVar4 = FUN_14022bb68(param_1);
+              if (cVar4 != '\0') {
+                cVar4 = i2c_read(param_1,0x98,0xf0);
+                if (cVar4 == 'T') {
+                  local_58 = 0;
+                }
+                else {
+                  local_58 = local_58 + 1;
+                  if (local_58 == 3) {
+                    local_58 = 0;
+                    if ((*(ushort *)(*(longlong *)(param_1 + 0x120) + 10) & 0xfff) == 0x531) {
+                      send_reset_vendors(param_1);
+                    }
+                    FUN_140247328(param_1);
+                    CheckIsMCUExist(param_1);
+                    if (((*(ushort *)(*(longlong *)(param_1 + 0x120) + 10) & 0xfff) == 0x531) &&
+                       (*(char *)(param_1 + 0x63f0) == '\x01')) {
+                      tw9900_init_all(param_1,*(undefined4 *)(param_1 + 0x6840),
+                                      *(undefined4 *)(param_1 + 0x6850),
+                                      *(undefined4 *)(param_1 + 0x6854),
+                                      *(undefined4 *)(param_1 + 0x6858),1);
+                    }
+                  }
+                }
+              }
+
+
+
