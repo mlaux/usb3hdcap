@@ -1,0 +1,314 @@
+commit c269551698ce4ae04bb2e4b9f43a3c67e6e6fb25
+Author: Matthew Laux <matthew.laux@gmail.com>
+staging: media: add driver for StarTech USB3HDCAP
+This adds a V4L2 driver for the StarTech USB3HDCAP video capture device,
+supporting composite, S-Video, component, and HDMI inputs. It also includes
+an ALSA capture device for audio support.
+> diff --git a/drivers/staging/media/usb3hdcap/usb3hdcap-audio.c b/drivers/staging/media/usb3hdcap/usb3hdcap-audio.c
+> new file mode 100644
+> index 000000000000..42bd1dcd70d8
+> --- /dev/null
+> +++ b/drivers/staging/media/usb3hdcap/usb3hdcap-audio.c
+[ ... ]
+> +static int snd_hdcap_pcm_close(struct snd_pcm_substream *substream)
+> +{
+> +	struct usb3hdcap *hdcap = snd_pcm_substream_chip(substream);
+> +
+> +	atomic_set(&hdcap->snd_stream, 0);
+> +	hdcap->snd_substream = NULL;
+> +
+> +	return 0;
+> +}
+[ ... ]
+> +void usb3hdcap_audio_data(struct usb3hdcap *hdcap, const u8 *data, int len)
+> +{
+> +	struct snd_pcm_substream *substream;
+> +	struct snd_pcm_runtime *runtime;
+> +	size_t frame_bytes, nframes;
+> +	size_t buffer_pos, period_pos;
+> +	int period_elapsed = 0;
+> +	unsigned long flags;
+> +
+> +	if (!atomic_read(&hdcap->snd_stream))
+> +		return;
+> +
+> +	substream = hdcap->snd_substream;
+> +	if (!substream)
+> +		return;
+> +
+> +	runtime = substream->runtime;
+Is this vulnerable to a use-after-free race condition? In
+usb3hdcap_audio_data(), the pointer to substream is read, and then
+substream->runtime is accessed without holding any locks protecting the
+lifecycle. 
+Concurrently, snd_hdcap_pcm_close() sets hdcap->snd_substream to NULL
+locklessly. If the URB handler is preempted after reading the substream
+pointer, the ALSA core could free the runtime structure before the handler
+resumes and dereferences it.
+> diff --git a/drivers/staging/media/usb3hdcap/usb3hdcap-core.c b/drivers/staging/media/usb3hdcap/usb3hdcap-core.c
+> new file mode 100644
+> index 000000000000..86efa5888f2f
+> --- /dev/null
+> +++ b/drivers/staging/media/usb3hdcap/usb3hdcap-core.c
+[ ... ]
+> +int vendor_out(struct usb3hdcap *hdcap, u8 request, u16 value, u16 index,
+> +	       u8 *data, u16 len)
+> +{
+> +	int ret;
+> +	u8 *buf = NULL;
+> +
+> +	if (len > 0) {
+> +		buf = kmemdup(data, len, GFP_KERNEL);
+> +		if (!buf)
+> +			return -ENOMEM;
+> +	}
+> +
+> +	ret = usb_control_msg(hdcap->usb_dev,
+> +			      usb_sndctrlpipe(hdcap->usb_dev, 0),
+> +			      request,
+> +			      USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+> +			      value, index, buf, len, 1000);
+If userspace calls an ioctl like VIDIOC_S_CTRL concurrently with device
+disconnect, could hdcap->usb_dev be NULL here? The usb_sndctrlpipe macro
+unconditionally dereferences the device pointer to access devnum, which
+would cause a panic.
+> +
+> +	kfree(buf);
+[ ... ]
+> +static int vendor_in(struct usb3hdcap *hdcap, u8 request, u16 value, u16 index,
+> +		     u8 *data, u16 len)
+> +{
+> +	u8 *buf;
+> +	int ret;
+> +
+> +	buf = kmalloc(len, GFP_KERNEL);
+> +	if (!buf)
+> +		return -ENOMEM;
+> +
+> +	ret = usb_control_msg(hdcap->usb_dev,
+> +			      usb_rcvctrlpipe(hdcap->usb_dev, 0),
+> +			      request,
+> +			      USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+> +			      value, index, buf, len, 1000);
+> +
+> +	if (ret >= 0)
+> +		memcpy(data, buf, min_t(int, ret, len));
+> +
+> +	kfree(buf);
+> +	return ret;
+> +}
+If usb_control_msg completes successfully but returns a short read of 0
+bytes, vendor_in returns 0 and memcpy copies 0 bytes. Will this cause
+functions like u3hc_i2c_read() to return uninitialized stack variables to the
+caller?
+> +static int mcu_i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg)
+> +{
+> +	u8 tx[3] = { addr | 1, 1, reg };
+> +	u8 val;
+> +	int ret;
+> +
+> +	/* send target addr, rx length, and register */
+> +	ret = vendor_out(hdcap, REQ_I2C, 0x5066, 0, tx, 3);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* Retrieve the result */
+> +	ret = vendor_in(hdcap, REQ_I2C, 0x5066, 0, &val, 1);
+Is it possible for a concurrent mcu_i2c_write from a V4L2 control operation
+to interleave between the vendor_out and vendor_in calls here? This might
+overwrite the gateway address state and corrupt the read result, since
+controls are protected by ctrl_handler->lock and not v4l2_lock.
+[ ... ]
+> +static int usb3hdcap_s_std(struct file *file, void *priv, v4l2_std_id norm)
+> +{
+> +	struct usb3hdcap *hdcap = video_drvdata(file);
+> +
+> +	if (!(hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO))
+> +		return -ENODATA;
+> +
+> +	if (!(norm & USB3HDCAP_V4L2_STDS))
+> +		return -EINVAL;
+> +
+> +	hdcap->requested_std = norm;
+> +	return 0;
+> +}
+Should this function check vb2_is_busy(&hdcap->vb2q) to prevent userspace
+from changing the standard while the device is actively streaming or buffers
+are already allocated?
+[ ... ]
+> +static int usb3hdcap_s_dv_timings(struct file *file, void *priv,
+> +				  struct v4l2_dv_timings *timings)
+> +{
+> +	struct usb3hdcap *hdcap = video_drvdata(file);
+> +
+> +	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
+> +		return -ENODATA;
+> +
+> +	hdcap->requested_timings = *timings;
+> +	hdcap->requested_timings_present = 1;
+> +	return 0;
+> +}
+Should this function also check vb2_is_busy(&hdcap->vb2q) for the same
+reasons mentioned above?
+[ ... ]
+> +static int usb3hdcap_probe(struct usb_interface *intf,
+> +			   const struct usb_device_id *id)
+> +{
+> +	struct device *dev;
+> +	struct usb3hdcap *hdcap;
+> +	int ret, is_xcapture;
+> +
+> +	/* not using the interrupt interface, just data */
+> +	if (intf->cur_altsetting->desc.bInterfaceNumber != 0)
+> +		return -ENODEV;
+> +
+> +	/* none, Mult=0 for SD, Mult=1 for HD */
+> +	if (intf->num_altsetting != 3)
+> +		return -ENODEV;
+> +
+> +	dev = &intf->dev;
+> +
+> +	hdcap = kzalloc_obj(*hdcap, GFP_KERNEL);
+Does this compile? The kzalloc_obj macro does not appear to exist in the
+Linux kernel API. Should this be kzalloc(sizeof(*hdcap), GFP_KERNEL) instead?
+[ ... ]
+> +static void usb3hdcap_disconnect(struct usb_interface *intf)
+> +{
+> +	struct usb3hdcap *hdcap = usb_get_intfdata(intf);
+> +
+> +	usb_set_intfdata(intf, NULL);
+> +
+> +	if (!hdcap)
+> +		return;
+> +
+> +	usb3hdcap_audio_free(hdcap);
+> +	vb2_video_unregister_device(&hdcap->video_dev);
+> +	v4l2_device_disconnect(&hdcap->v4l2_dev);
+> +
+> +	usb_put_dev(hdcap->usb_dev);
+> +	hdcap->usb_dev = NULL;
+> +
+> +	/* hdcap is freed by usb3hdcap_release when last user closes fd */
+> +	v4l2_device_put(&hdcap->v4l2_dev);
+> +}
+Could this result in a use-after-free if the ALSA device remains open?
+The usb3hdcap structure is freed when the v4l2_device refcount drops to zero.
+However, the ALSA sound card uses this structure as its private data without
+holding a reference to the v4l2_device. If userspace closes the V4L2 device
+but keeps the ALSA PCM device open, the structure will be freed and
+subsequent ALSA operations will dereference it.
+> diff --git a/drivers/staging/media/usb3hdcap/usb3hdcap-video.c b/drivers/staging/media/usb3hdcap/usb3hdcap-video.c
+> new file mode 100644
+> index 000000000000..bcd61cea17f0
+> --- /dev/null
+> +++ b/drivers/staging/media/usb3hdcap/usb3hdcap-video.c
+[ ... ]
+> +static struct urb *usb3hdcap_alloc_urb(struct usb3hdcap *hdcap)
+> +{
+> +	struct urb *urb;
+> +	int size = hdcap->iso_size;
+> +	int k;
+> +
+> +	urb = usb_alloc_urb(NUM_ISO_PKTS, GFP_KERNEL);
+> +	if (!urb)
+> +		return NULL;
+> +
+> +	urb->dev = hdcap->usb_dev;
+> +	urb->context = hdcap;
+> +	urb->pipe = usb_rcvisocpipe(hdcap->usb_dev, EP_VIDEO);
+> +	urb->interval = 1;
+> +	urb->transfer_flags = URB_ISO_ASAP;
+> +	urb->transfer_buffer = kcalloc(NUM_ISO_PKTS, size, GFP_KERNEL);
+Can this allocation fail due to memory fragmentation? With NUM_ISO_PKTS
+at 64, and size potentially up to 48KB for SuperSpeed endpoints, this asks
+for up to 3MB of contiguous physical memory per URB. Across 8 URBs, this
+requests 24MB of contiguous memory, which is very likely to fail on a running
+system.
+> +	if (!urb->transfer_buffer) {
+> +		usb_free_urb(urb);
+> +		return NULL;
+> +	}
+[ ... ]
+> +static void usb3hdcap_stop(struct usb3hdcap *hdcap)
+> +{
+[ ... ]
+> +	spin_lock_irqsave(&hdcap->buflock, flags);
+> +	while (!list_empty(&hdcap->bufs)) {
+> +		struct hdcap_buf *buf = list_first_entry(&hdcap->bufs,
+> +						struct hdcap_buf, list);
+> +		vb2_buffer_done(&buf->vb.vb2_buf, VB2_BUF_STATE_ERROR);
+> +		list_del(&buf->list);
+> +	}
+> +	spin_unlock_irqrestore(&hdcap->buflock, flags);
+Is it safe to call list_del after vb2_buffer_done? The vb2_buffer_done
+function transfers ownership of the buffer back to the videobuf2 core, which
+may immediately recycle or free it. Modifying the list pointer afterward
+could result in a use-after-free or list corruption.
+> +
+> +	vfree(hdcap->parse_buf);
+> +	hdcap->parse_buf = NULL;
+> +}
+> +
+> +static int usb3hdcap_start(struct usb3hdcap *hdcap)
+> +{
+> +	struct usb_host_endpoint *ep;
+> +	int maxp, burst, mult;
+> +	int k, ret, alt;
+> +
+> +	if (!hdcap->hw_inited) {
+> +		ret = usb3hdcap_hw_init(hdcap);
+> +		if (ret < 0) {
+> +			dev_err(hdcap->dev, "open: hw_init failed: %d\n", ret);
+> +			return ret;
+> +		}
+> +		hdcap->hw_inited = 1;
+> +	}
+> +
+> +	hdcap->parse_buf = vzalloc(PARSE_BUF_SIZE);
+> +	if (!hdcap->parse_buf)
+> +		return -ENOMEM;
+Does this early return violate the videobuf2 API contract? The API requires
+returning all queued buffers to the framework with VB2_BUF_STATE_QUEUED if
+start_streaming fails.
+[ ... ]
+> +	/* Compute ISO packet size from SS endpoint companion descriptor */
+> +	ep = usb_pipe_endpoint(hdcap->usb_dev,
+> +			       usb_rcvisocpipe(hdcap->usb_dev, EP_VIDEO));
+> +	if (!ep) {
+> +		dev_err(hdcap->dev, "ISO endpoint 0x%02x not found\n",
+> +			EP_VIDEO);
+> +		return -ENODEV;
+> +	}
+Does the driver need to verify that this endpoint is actually an isochronous
+endpoint using usb_endpoint_xfer_isoc? A malicious USB device presenting a
+bulk or interrupt endpoint here might cause host controller warnings or
+crashes when an isochronous URB is submitted.
+[ ... ]
+> +static int usb3hdcap_queue_setup(struct vb2_queue *vq, unsigned int *nbuffers,
+> +				 unsigned int *nplanes, unsigned int sizes[],
+> +	struct device *alloc_devs[])
+> +{
+> +	struct usb3hdcap *hdcap = vb2_get_drv_priv(vq);
+> +	unsigned int img_size = hdcap->bpl * hdcap->height;
+Can this sequence result in a heap buffer overflow? If userspace calls
+VIDIOC_REQBUFS before the signal is locked, buffers are sized here for SD
+video. Later, start_streaming calls usb3hdcap_hw_init which locks the signal.
+If a 1080p signal is found, the driver dynamically increases hdcap->height
+and hdcap->bpl. When process_video_line later writes the larger 1080p frame
+into the smaller SD-sized vb2 buffer, it will write out of bounds.
+[ ... ]
+> +static void usb3hdcap_stop_streaming(struct vb2_queue *vq)
+> +{
+> +	struct usb3hdcap *hdcap = vb2_get_drv_priv(vq);
+> +
+> +	if (hdcap->usb_dev)
+> +		usb3hdcap_stop(hdcap);
+> +}
+Will this leak memory and cause a use-after-free on disconnect? During
+disconnect, hdcap->usb_dev is set to NULL. When the V4L2 device is later
+released, vb2_queue_release calls usb3hdcap_stop_streaming. Because
+hdcap->usb_dev is NULL, usb3hdcap_stop is entirely bypassed. The ISO URBs are
+never killed, and the transfer buffers are never freed. The still-running
+URBs will eventually invoke their completion handlers and dereference the
+freed hdcap structure.
+
