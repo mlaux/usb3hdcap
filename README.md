@@ -56,6 +56,13 @@ make
 * XCAPTURE-1 component is untested
 * No HDCP support
 
+### AI
+
+I wrote this myself. I will accept PRs written using AI as long as they work,
+don't have cringe comments (they're so bad, seriously), and both me and the
+contributor understand what they're doing. See my
+["How I feel about LLMs"](http://constcast.org/llms.html) for more
+
 ## Thanks
 
 * [stoth68000](https://github.com/stoth68000) for [hdcapm](https://github.com/stoth68000/hdcapm)
