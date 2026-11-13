@@ -3,7 +3,7 @@
  * USB3HDCAP audio support - CS53L21 init + ALSA capture device
  *
  * Audio is embedded in the isochronous video stream as 48kHz stereo
- * 16-bit LE PCM. Each video line carries 8, 12, or 16 bytes of audio data.
+ * 16-bit LE PCM. Each video line contains 8, 12, or 16 bytes of audio data.
  */
 
 #include <sound/core.h>
@@ -13,7 +13,6 @@
 
 #include "usb3hdcap.h"
 
-/* ALSA buffer sizing */
 #define HDCAP_AUDIO_BUFSZ	(64 * 1024)
 
 static const struct snd_pcm_hardware snd_hdcap_hw = {
@@ -54,7 +53,7 @@ static int snd_hdcap_pcm_close(struct snd_pcm_substream *substream)
 	struct usb3hdcap *hdcap = snd_pcm_substream_chip(substream);
 
 	atomic_set(&hdcap->snd_stream, 0);
-	hdcap->snd_substream = NULL;
+	WRITE_ONCE(hdcap->snd_substream, NULL);
 
 	return 0;
 }
@@ -107,7 +106,7 @@ static const struct snd_pcm_ops snd_hdcap_pcm_ops = {
 };
 
 /* ------------------------------------------------------------------ */
-/* Audio data feed (called from ISO URB handler in usb3hdcap-core.c)  */
+/* Audio data feed                                                    */
 /* ------------------------------------------------------------------ */
 
 void usb3hdcap_audio_data(struct usb3hdcap *hdcap, const u8 *data, int len)
@@ -116,17 +115,16 @@ void usb3hdcap_audio_data(struct usb3hdcap *hdcap, const u8 *data, int len)
 	struct snd_pcm_runtime *runtime;
 	size_t frame_bytes, nframes;
 	size_t buffer_pos, period_pos;
-	int period_elapsed = 0;
 	unsigned long flags;
 
-	if (!atomic_read(&hdcap->snd_stream))
-		return;
-
-	substream = hdcap->snd_substream;
+	substream = READ_ONCE(hdcap->snd_substream);
 	if (!substream)
 		return;
 
 	snd_pcm_stream_lock_irqsave(substream, flags);
+
+	if (!atomic_read(&hdcap->snd_stream))
+		goto out;
 
 	runtime = substream->runtime;
 	if (!runtime || !runtime->dma_area)
@@ -157,19 +155,17 @@ void usb3hdcap_audio_data(struct usb3hdcap *hdcap, const u8 *data, int len)
 	if (buffer_pos >= runtime->buffer_size)
 		buffer_pos -= runtime->buffer_size;
 
-	if (period_pos >= runtime->period_size) {
-		period_pos -= runtime->period_size;
-		period_elapsed = 1;
-	}
-
 	hdcap->snd_buffer_pos = buffer_pos;
-	hdcap->snd_period_pos = period_pos;
+
+	if (period_pos >= runtime->period_size) {
+		hdcap->snd_period_pos = period_pos - runtime->period_size;
+		snd_pcm_period_elapsed_under_stream_lock(substream);
+	} else {
+		hdcap->snd_period_pos = period_pos;
+	}
 
 out:
 	snd_pcm_stream_unlock_irqrestore(substream, flags);
-
-	if (period_elapsed)
-		snd_pcm_period_elapsed(substream);
 }
 
 /* ------------------------------------------------------------------ */

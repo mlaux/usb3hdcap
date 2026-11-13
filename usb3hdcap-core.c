@@ -112,6 +112,17 @@ static int vendor_in(struct usb3hdcap *hdcap, u8 request, u16 value, u16 index,
 	return ret;
 }
 
+int usb3hdcap_stream_ctl(struct usb3hdcap *hdcap, bool enable, u8 *watch,
+			 u16 len)
+{
+	/* High byte sets whether the watched regs have to go through the MCU */
+	u16 index = (hdcap->has_mcu ? 0x0100 : 0) | (enable ? 0x01 : 0);
+
+	/* wValue 0x32 is from the Windows driver, maybe an interval in ms? */
+	return vendor_out(hdcap, REQ_STREAM, enable ? 0x0032 : 0x0000, index,
+			  watch, len);
+}
+
 /* ------------------------------------------------------------------ */
 /* MCU I2C tunnel (XCAPTURE-1)                                        */
 /*                                                                    */
@@ -282,12 +293,30 @@ static void usb3hdcap_probe_mcu(struct usb3hdcap *hdcap)
 /* Device-level init + GPIO pin state? shared between all inputs */
 static int usb3hdcap_device_init(struct usb3hdcap *hdcap)
 {
+	bool is_xcapture =
+		le16_to_cpu(hdcap->usb_dev->descriptor.idProduct) == XCAPTURE1_PID;
+
+	if (is_xcapture) {
+		/*
+		 * XCAPTURE-1: The Windows driver reads REQ_INIT and
+		 * sends this when the read fails or returns non-zero, purpose unknown
+		 */
+		u8 unk_ec[] = {
+			0xb8, 0x22, 0xb1, 0xd2, 0x03, 0xc0, 0xff, 0x00, 0x00, 0xca,
+		};
+		u8 state = 0;
+
+		if (vendor_in(hdcap, REQ_INIT, 0x0000, 0, &state, 1) < 0 || state)
+			vendor_out(hdcap, REQ_UNK_EC, 0x0000, 0,
+				   unk_ec, sizeof(unk_ec));
+	}
+
 	vendor_out(hdcap, REQ_INIT,   0x0000, 0, NULL, 0);
 	vendor_out(hdcap, REQ_UNK_C7, 0x0064, 0, NULL, 0);
 	/* Windows driver does this but is always fails? */
 	/* vendor_out(hdcap, 0xc5, 0x0000, 0, NULL, 0); */
-	vendor_out(hdcap, REQ_STREAM, 0x0000, 0, NULL, 0);
-	vendor_out(hdcap, REQ_STREAM, 0x0000, 0, NULL, 0);
+	usb3hdcap_stream_ctl(hdcap, false, NULL, 0);
+	usb3hdcap_stream_ctl(hdcap, false, NULL, 0);
 
 	/*
 	 * just replay what the windows driver does:
@@ -311,8 +340,7 @@ static int usb3hdcap_device_init(struct usb3hdcap *hdcap)
 	vendor_out(hdcap, REQ_GPIO, 0x802d, 0, NULL, 0);
 
 	/* Probe for MCU after GPIO reset (XCAPTURE-1 only) */
-	if (!hdcap->has_mcu &&
-	    le16_to_cpu(hdcap->usb_dev->descriptor.idProduct) == XCAPTURE1_PID)
+	if (!hdcap->has_mcu && is_xcapture)
 		usb3hdcap_probe_mcu(hdcap);
 
 	return 0;
@@ -426,11 +454,7 @@ static int usb3hdcap_fmt_vid_cap(struct file *file, void *priv,
 	f->fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
 	f->fmt.pix.field = interlaced ? V4L2_FIELD_ALTERNATE : V4L2_FIELD_NONE;
 	f->fmt.pix.bytesperline = width * 2;
-	/* always size SD buffers for PAL */
-	if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)
-		f->fmt.pix.sizeimage = SD_WIDTH * 2 * (PAL_HEIGHT / 2);
-	else
-		f->fmt.pix.sizeimage = f->fmt.pix.bytesperline * height;
+	f->fmt.pix.sizeimage = f->fmt.pix.bytesperline * height;
 	f->fmt.pix.colorspace = (hdcap->input == INPUT_HDMI) ?
 		V4L2_COLORSPACE_REC709 : V4L2_COLORSPACE_SMPTE170M;
 
@@ -1017,13 +1041,6 @@ static int usb3hdcap_probe(struct usb_interface *intf,
 				    hdcap, &stream_dump_fops);
 	}
 
-	/*
-	 * Take an extra ref so that disconnect's v4l2_device_put doesn't
-	 * immediately trigger usb3hdcap_release before cleanup is done - based on
-	 * usbtv driver
-	 */
-	v4l2_device_get(&hdcap->v4l2_dev);
-
 	is_xcapture = le16_to_cpu(hdcap->usb_dev->descriptor.idProduct) == XCAPTURE1_PID;
 	dev_info(dev, "%s USB 3.0 HD Video Capture Device",
 		 is_xcapture ? "Micomsoft XCAPTURE-1" : "StarTech USB3HDCAP");
@@ -1047,8 +1064,8 @@ static void usb3hdcap_disconnect(struct usb_interface *intf)
 		return;
 
 	debugfs_remove_recursive(hdcap->debugfs_dir);
-	usb3hdcap_audio_free(hdcap);
 	vb2_video_unregister_device(&hdcap->video_dev);
+	usb3hdcap_audio_free(hdcap);
 	v4l2_device_disconnect(&hdcap->v4l2_dev);
 
 	usb_put_dev(hdcap->usb_dev);

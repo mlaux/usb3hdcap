@@ -235,13 +235,13 @@ resubmit:
 		dev_warn(hdcap->dev, "ISO URB resubmit: %d\n", ret);
 }
 
-static struct urb *usb3hdcap_alloc_urb(struct usb3hdcap *hdcap)
+static struct urb *usb3hdcap_alloc_urb(struct usb3hdcap *hdcap, int npkts)
 {
 	struct urb *urb;
 	int size = hdcap->iso_size;
 	int k;
 
-	urb = usb_alloc_urb(NUM_ISO_PKTS, GFP_KERNEL);
+	urb = usb_alloc_urb(npkts, GFP_KERNEL);
 	if (!urb)
 		return NULL;
 
@@ -250,15 +250,16 @@ static struct urb *usb3hdcap_alloc_urb(struct usb3hdcap *hdcap)
 	urb->pipe = usb_rcvisocpipe(hdcap->usb_dev, EP_VIDEO);
 	urb->interval = 1;
 	urb->transfer_flags = URB_ISO_ASAP;
-	urb->transfer_buffer = kcalloc(NUM_ISO_PKTS, size, GFP_KERNEL);
+	/* __NOWARN because it retries with fewer packets */
+	urb->transfer_buffer = kcalloc(npkts, size, GFP_KERNEL | __GFP_NOWARN);
 	if (!urb->transfer_buffer) {
 		usb_free_urb(urb);
 		return NULL;
 	}
 	urb->complete = usb3hdcap_iso_cb;
-	urb->number_of_packets = NUM_ISO_PKTS;
-	urb->transfer_buffer_length = size * NUM_ISO_PKTS;
-	for (k = 0; k < NUM_ISO_PKTS; k++) {
+	urb->number_of_packets = npkts;
+	urb->transfer_buffer_length = size * npkts;
+	for (k = 0; k < npkts; k++) {
 		urb->iso_frame_desc[k].offset = size * k;
 		urb->iso_frame_desc[k].length = size;
 	}
@@ -266,11 +267,9 @@ static struct urb *usb3hdcap_alloc_urb(struct usb3hdcap *hdcap)
 	return urb;
 }
 
-static void usb3hdcap_stop(struct usb3hdcap *hdcap,
-			   enum vb2_buffer_state buf_state)
+static void usb3hdcap_free_urbs(struct usb3hdcap *hdcap)
 {
 	int k;
-	unsigned long flags;
 
 	for (k = 0; k < NUM_XFERS; k++) {
 		struct urb *urb = hdcap->isoc_urbs[k];
@@ -282,10 +281,57 @@ static void usb3hdcap_stop(struct usb3hdcap *hdcap,
 		usb_free_urb(urb);
 		hdcap->isoc_urbs[k] = NULL;
 	}
+}
+
+static int usb3hdcap_alloc_urbs(struct usb3hdcap *hdcap)
+{
+	int npkts, k;
+
+	/* Retry allocations until one succeeds */
+	for (npkts = NUM_ISO_PKTS; npkts >= MIN_ISO_PKTS; npkts /= 2) {
+		for (k = 0; k < NUM_XFERS; k++) {
+			hdcap->isoc_urbs[k] = usb3hdcap_alloc_urb(hdcap, npkts);
+			if (!hdcap->isoc_urbs[k])
+				break;
+		}
+		if (k == NUM_XFERS)
+			return 0;
+		usb3hdcap_free_urbs(hdcap);
+	}
+
+	return -ENOMEM;
+}
+
+/* Returns true if every queued buffer can hold a frame of the current format */
+static bool usb3hdcap_bufs_fit(struct usb3hdcap *hdcap)
+{
+	unsigned long img_size = hdcap->bpl * hdcap->height;
+	struct hdcap_buf *buf;
+	unsigned long flags;
+	bool fit = true;
+
+	spin_lock_irqsave(&hdcap->buflock, flags);
+	list_for_each_entry(buf, &hdcap->bufs, list) {
+		if (vb2_plane_size(&buf->vb.vb2_buf, 0) < img_size) {
+			fit = false;
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&hdcap->buflock, flags);
+
+	return fit;
+}
+
+static void usb3hdcap_stop(struct usb3hdcap *hdcap,
+			   enum vb2_buffer_state buf_state)
+{
+	unsigned long flags;
+
+	usb3hdcap_free_urbs(hdcap);
 
 	/* already NULL if this stop came from a disconnect */
 	if (hdcap->usb_dev) {
-		vendor_out(hdcap, REQ_STREAM, 0x0000, 0, NULL, 0);
+		usb3hdcap_stream_ctl(hdcap, false, NULL, 0);
 		usb_set_interface(hdcap->usb_dev, 0, 0);
 	}
 
@@ -323,6 +369,20 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 		hdcap->hw_inited = 1;
 	}
 
+	/*
+	 * Avoids this super edge case:
+	 * 1. HDMI or component selected with a mode detected
+	 * 2. s_input fails because of no signal, input reverts, hw_inited = 0
+	 * 3. The application does REQBUFS for the original size
+	 * 4. The source has switched to a larger mode and STREAMON redetects
+	 */
+	if (!usb3hdcap_bufs_fit(hdcap)) {
+		dev_err(hdcap->dev, "buffers too small for %dx%d\n",
+			hdcap->width, hdcap->height);
+		ret = -EINVAL;
+		goto fail;
+	}
+
 	hdcap->parse_buf = vzalloc(PARSE_BUF_SIZE);
 	if (!hdcap->parse_buf) {
 		ret = -ENOMEM;
@@ -338,7 +398,7 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 
 	if (hdcap->input == INPUT_HDMI) {
 		/*
-		 * this is a register watchlist, interrupt generated n endpoint 1 when
+		 * this is a register watchlist, interrupt generated on endpoint 1 when
 		 * (value & mask) changes.
 		 *
 		 * struct reg_watch {
@@ -362,18 +422,17 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 			0x11, 0x82, 0xff, 0x00,  0x12, 0x82, 0xff, 0x00,
 			0x11, 0x82, 0xff, 0x00,  0x12, 0x82, 0xff, 0x00,
 		};
-		ret = vendor_out(hdcap, REQ_STREAM, 0x0032, 1,
-				 stream_payload, sizeof(stream_payload));
+		ret = usb3hdcap_stream_ctl(hdcap, true, stream_payload,
+					   sizeof(stream_payload));
 	} else if (hdcap->input == INPUT_COMPONENT) {
-		/* Component: monitor MST3367 ADC registers */
 		u8 stream_payload[] = {
 			0x14, 0x80, 0x90, 0x00,  0x15, 0x80, 0x46, 0x00,
 			0x5b, 0x80, 0x07, 0x00,  0x5c, 0x80, 0xf8, 0x00,
 			0x57, 0x80, 0x3f, 0x00,  0x5f, 0x80, 0x12, 0x00,
 			0x11, 0x82, 0xff, 0x00,  0x12, 0x82, 0xff, 0x00,
 		};
-		ret = vendor_out(hdcap, REQ_STREAM, 0x0032, 1,
-				 stream_payload, sizeof(stream_payload));
+		ret = usb3hdcap_stream_ctl(hdcap, true, stream_payload,
+					   sizeof(stream_payload));
 	} else {
 		u8 stream_payload[] = {
 			0x01, 0x40, 0xe9, 0x88,
@@ -381,8 +440,8 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 			0x30, 0x40, 0x0f, 0x88,
 		};
 		v4l2_ctrl_handler_setup(&hdcap->ctrl);
-		ret = vendor_out(hdcap, REQ_STREAM, 0x0032, 1,
-				 stream_payload, sizeof(stream_payload));
+		ret = usb3hdcap_stream_ctl(hdcap, true, stream_payload,
+					   sizeof(stream_payload));
 	}
 
 	if (ret < 0)
@@ -406,7 +465,7 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 	/* Compute ISO packet size from SS endpoint companion descriptor */
 	ep = usb_pipe_endpoint(hdcap->usb_dev,
 			       usb_rcvisocpipe(hdcap->usb_dev, EP_VIDEO));
-	if (!ep) {
+	if (!ep || !usb_endpoint_xfer_isoc(&ep->desc)) {
 		dev_err(hdcap->dev, "ISO endpoint 0x%02x not found\n",
 			EP_VIDEO);
 		ret = -ENODEV;
@@ -418,16 +477,12 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 	mult = USB_SS_MULT(ep->ss_ep_comp.bmAttributes);
 	hdcap->iso_size = maxp * (burst + 1) * mult;
 
+	ret = usb3hdcap_alloc_urbs(hdcap);
+	if (ret < 0)
+		goto fail;
+
 	for (k = 0; k < NUM_XFERS; k++) {
-		struct urb *urb = usb3hdcap_alloc_urb(hdcap);
-
-		if (!urb) {
-			ret = -ENOMEM;
-			goto fail;
-		}
-		hdcap->isoc_urbs[k] = urb;
-
-		ret = usb_submit_urb(urb, GFP_KERNEL);
+		ret = usb_submit_urb(hdcap->isoc_urbs[k], GFP_KERNEL);
 		if (ret < 0)
 			goto fail;
 	}
@@ -449,13 +504,7 @@ static int usb3hdcap_queue_setup(struct vb2_queue *vq, unsigned int *nbuffers,
 	struct device *alloc_devs[])
 {
 	struct usb3hdcap *hdcap = vb2_get_drv_priv(vq);
-	unsigned int img_size;
-
-	/* worst case for composite/svideo is 720x288x2 */
-	if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)
-		img_size = SD_WIDTH * 2 * (PAL_HEIGHT / 2);
-	else /* hdmi/component always have a real detected size */
-		img_size = hdcap->bpl * hdcap->height;
+	unsigned int img_size = hdcap->bpl * hdcap->height;
 
 	if (*nplanes) {
 		dev_info(hdcap->dev, "queue_setup: recheck sizes[0]=%u vs %u\n",
@@ -505,8 +554,7 @@ static void usb3hdcap_stop_streaming(struct vb2_queue *vq)
 {
 	struct usb3hdcap *hdcap = vb2_get_drv_priv(vq);
 
-	if (hdcap->usb_dev)
-		usb3hdcap_stop(hdcap, VB2_BUF_STATE_ERROR);
+	usb3hdcap_stop(hdcap, VB2_BUF_STATE_ERROR);
 }
 
 const struct vb2_ops usb3hdcap_vb2_ops = {

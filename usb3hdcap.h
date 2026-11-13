@@ -105,15 +105,16 @@ enum usb3hdcap_input {
 #define REQ_INIT   0xc2
 #define REQ_STREAM 0xc6
 #define REQ_UNK_C7 0xc7
+#define REQ_UNK_EC 0xec
 
 /* Isochronous transfer parameters */
 #define EP_VIDEO     0x83
 #define NUM_XFERS    8
 #define NUM_ISO_PKTS 64
+#define MIN_ISO_PKTS 8
 
 /*
- * Stream framing: two element types in the byte stream, both
- * starting with ff 00:
+ * Stream framing:
  *   SAV (ff 00 00 XY): bpl-1 pixel bytes, -1 because the XY is actually
  *   in the first pixel's V position... weird but it's correct
  *   Marker (ff 00 ff NN):  audio - NN = number of stereo s16le
@@ -217,6 +218,8 @@ struct usb3hdcap {
 /* USB control helpers (usb3hdcap-core.c) */
 int vendor_out(struct usb3hdcap *hdcap, u8 request, u16 value, u16 index,
 	       u8 *data, u16 len);
+int usb3hdcap_stream_ctl(struct usb3hdcap *hdcap, bool enable, u8 *watch,
+			 u16 len);
 int u3hc_i2c_write(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 val);
 int u3hc_i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg);
 int u3hc_i2c_rmw(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits);

@@ -252,7 +252,8 @@ static void cpld_init(struct usb3hdcap *hdcap, u8 mux_val)
 	 * }
 	 */
 
-	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x3b, mux_val);
+	if (u3hc_i2c_read(hdcap, ADDR_CPLD, 0x3b) != 0)
+		u3hc_i2c_write(hdcap, ADDR_CPLD, 0x3b, mux_val);
 
 	/*
 	 * local_res8[0] = '\x05';
@@ -412,16 +413,25 @@ static const struct v4l2_dv_timings *match_hdmi_timing(int htotal, int vtotal,
 	return NULL;
 }
 
+static void mst3367_enable_auto_position(struct usb3hdcap *hdcap)
+{
+	mst_bank(hdcap, 0x00);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x80);
+	/* report the digital DE window */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe3, 0x08);
+	/* position threshold */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe4, 0x00);
+}
+
 static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 {
 	int k, status;
 	int prev_htotal = -1, prev_vtotal = -1, prev_hactive = -1;
 	int stable_count = 0;
 
-	vendor_out(hdcap, REQ_STREAM, 0x0000, 0, NULL, 0);
+	usb3hdcap_stream_ctl(hdcap, false, NULL, 0);
 
-	mst_bank(hdcap, 0x00);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x80);
+	mst3367_enable_auto_position(hdcap);
 	msleep(100);
 
 	for (k = 0; k < 100; k++) {
@@ -436,8 +446,8 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 			continue;
 
 		if (!(status & 0x3c)) {
-			/* Not locked yet, ENABLE AUTO POSITION */
-			u3hc_i2c_write(hdcap, ADDR_MST3367, 0xe2, 0x80);
+			/* Not locked yet */
+			mst3367_enable_auto_position(hdcap);
 			if (k % 10 == 0)
 				dev_info(hdcap->dev,
 					 "HDMI signal poll[%d]: lock=0x%02x (no signal)\n",
@@ -461,7 +471,7 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 				 k, status, htotal, vtotal, hactive, stable_count);
 
 		/*
-		 * Require non-zero timings AND two consecutive identical
+		 * Require non-zero timings and two consecutive identical
 		 * readings before accepting
 		 */
 		if (htotal == 0 || vtotal == 0 || hactive == 0 ||
@@ -636,7 +646,7 @@ static int component_poll_signal(struct usb3hdcap *hdcap,
 	int k, status, vtotal, htotal;
 	int signal_count = 0;
 
-	vendor_out(hdcap, REQ_STREAM, 0x0000, 0, NULL, 0);
+	usb3hdcap_stream_ctl(hdcap, false, NULL, 0);
 
 	/*
 	 * RxAdcModeDetect()
