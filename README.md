@@ -53,9 +53,7 @@ make
 * Other video modes will probably "just work" if the appropriate entries are
   added in the mode tables and code is added to disambiguate using htotal if
   necessary
-* HDMI color space correction produces incorrect colors with some sources, I
-  have the data from the Windows packet captures to fix this but haven't yet
-* XCAPTURE-1 HDMI and component are not usable / untested
+* XCAPTURE-1 component is untested
 * No HDCP support
 
 ## Thanks
