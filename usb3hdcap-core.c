@@ -18,8 +18,8 @@
  *
  * Audio is supported and should work with all inputs.
  *
- * Also partially supports the Micomsoft XCAPTURE-1 for composite and
- * S-Video only... HDMI is unusable, component is untested.
+ * Also partially supports the Micomsoft XCAPTURE-1 for composite, S-Video,
+ * and HDMI... component is untested but should work.
  *
  * Based on USBPcap analysis and reverse engineering of CY3014.X64.SYS
  *   (version 1.1.0.193 of Fri, 04 Jun 2021 09:37:45 UTC)
