@@ -127,7 +127,6 @@ enum usb3hdcap_input {
 #define SAV_LEN        4
 #define MARKER_LEN     4
 #define PARSE_BUF_SIZE (2 * 1024 * 1024)
-#define STREAM_DUMP_SIZE (1 << 20) /* 1 MB */
 
 /* BT.656 SAV XY bits */
 #define BT656_F_BIT 0x40
@@ -213,11 +212,6 @@ struct usb3hdcap {
 	unsigned long iso_bytes;
 	unsigned int markers_found;
 	unsigned int frames_delivered;
-
-	/* stream dump (debugfs) */
-	struct dentry *debugfs_dir;
-	u8 *dump_buf;
-	size_t dump_len;
 };
 
 /* USB control helpers (usb3hdcap-core.c) */
