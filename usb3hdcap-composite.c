@@ -134,8 +134,6 @@ int usb3hdcap_composite_init(struct usb3hdcap *hdcap)
 	}
 	v4l2_ctrl_handler_setup(&hdcap->ctrl);
 
-	usb3hdcap_stream_ctl(hdcap, false, NULL, 0);
-
 	for (k = 0; k < 10; k++) {
 		status = u3hc_i2c_read(hdcap, ADDR_TW9900, TW9900_CSTATUS);
 

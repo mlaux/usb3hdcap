@@ -121,6 +121,7 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 
 	mst_bank(hdcap, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x51, 0x80);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x13, 0x08);
 	/* RxTmdsHotPlug: all off */
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xb7, 0xff, 0x02);
 	/* RxGeneralInit */
@@ -167,6 +168,7 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1e, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1f, 0x00);
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x25, 0xff ^ 0xa2, 0xa2);
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x02, 0x7f, 0x80);
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x07, ~0x04, 0x04);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x17, 0xc0);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x19, 0xff);
@@ -293,7 +295,7 @@ static const u8 csc_identity_hdmi[] = {
 	0x10, 0x00,  0x00, 0x00,  0x00, 0x00,
 	0x00, 0x00,  0x10, 0x00,  0x00, 0x00,
 	0x00, 0x00,  0x00, 0x00,  0x10, 0x00,
-	0x20, 0x00,  0x04, 0x00,  0x20, 0x00,
+	0x20, 0x00,  0x00, 0x00,  0x20, 0x00,
 };
 
 /* BT.601 for SD (width <= 720) */
@@ -312,26 +314,28 @@ static const u8 csc_r2y_hd[] = {
 	0x20, 0x00,  0x00, 0x00,  0x20, 0x00,
 };
 
+#define COLOR_RGB 0x00
+#define COLOR_YUV422 0x20
+#define COLOR_YUV444 0x40
+
 void mst3367_write_csc(struct usb3hdcap *hdcap)
 {
 	bool comp = (hdcap->input == INPUT_COMPONENT);
 	const u8 *csc;
 	u8 old_ab, reg_92;
+	bool limited = false;
+	/* this can be overridden by the source */
+	bool bt601 = hdcap->width <= 720;
 	int k;
 
 	if (comp) {
 		reg_92 = 0x66;
 		csc = csc_identity_component;
 	} else {
-		/*
-		 * Auto-detect HDMI input colorspace:
-		 *
-		 * RxHdmiPacketStatus (0x02:0x0B/0x0C/0x0E): bit 3 indicates
-		 * an AVI InfoFrame has been received?
-		 * RxHdmiPacketColor (0x02:0x48 bits 6:5):
-		 *   0x00 = RGB, 0x20 = YUV422, 0x40 = YUV444
-		 */
-		int pkt_status, color = 0x00;
+		int pkt_status;
+		int color = 0;
+		int quant = 0;
+		int colorimetry = 0;
 
 		mst_bank(hdcap, 0x02);
 		pkt_status = (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x0c) & 0x3f) << 8 |
@@ -339,44 +343,60 @@ void mst3367_write_csc(struct usb3hdcap *hdcap)
 		if (u3hc_i2c_read(hdcap, ADDR_MST3367, 0x0e) & 0x08)
 			pkt_status |= 0x8000;
 
-		if (pkt_status & 0x0008)
+		/* ref: RxHdmiPacketColor */
+		if (pkt_status & 0x8) {
+			/* 0x00 = RGB, 0x20 = YUV422, 0x40 = YUV444 */
 			color = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x48) & 0x60;
+			/* 0 = default, 1 = limited, 2 = full */
+			quant = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x4a);
+			quant = quant < 0 ? 0 : (quant >> 2) & 0x03;
+			limited = quant == 1;
+			/* 0 = not stated, 1 = BT.601, 2 = BT.709 */
+			colorimetry = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x49);
+			colorimetry = colorimetry < 0 ? 0 : colorimetry >> 6;
+		}
 
 		dev_info(hdcap->dev,
-			 "CSC: pkt_status=0x%04x color=0x%02x\n",
-			 pkt_status, color);
+			 "CSC: pkt_status=0x%04x color=0x%02x quant=%d colorimetry=%d\n",
+			 pkt_status, color, quant, colorimetry);
 
-		if (color == 0x00) {
-			/* RGB: need R2Y conversion for YUV422 output */
-			reg_92 = 0x40;
-			csc = (hdcap->width <= 720) ? csc_r2y_sd : csc_r2y_hd;
+		if (color == COLOR_RGB) {
+			reg_92 = limited ? 0x55 : 0x40;
+			csc = bt601 ? csc_r2y_sd : csc_r2y_hd;
 			dev_info(hdcap->dev, "CSC: HDMI RGB, %s R2Y\n",
-				 (hdcap->width <= 720) ? "BT.601" : "BT.709");
+				 bt601 ? "BT.601" : "BT.709");
 		} else {
-			/* YCbCr input: identity passthrough */
-			reg_92 = 0x62;
+			bt601 = colorimetry == 1;
+			reg_92 = limited ? 0x66 : 0x62;
 			csc = csc_identity_hdmi;
-			dev_info(hdcap->dev, "CSC: HDMI YCbCr (0x%02x), identity\n",
-				 color);
+			dev_info(hdcap->dev,
+				 "CSC: HDMI YCbCr (0x%02x), %s\n",
+				 color, bt601 ? "BT.601" : "BT.709");
 		}
 	}
+
+	hdcap->mst_bt601 = bt601;
 
 	mst_bank(hdcap, 0x00);
 
 	/* BLANK.OUTPUT while changing CSC */
 	u3hc_i2c_rmw_get_old(hdcap, ADDR_MST3367, 0xab, 0x7f, 0x80, &old_ab);
 
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x90, 0x15); /* COLOR.RANGE */
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x91, 0x15); /* COLOR.RANGE */
+	/* COLOR.RANGE */
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x90, 0x15);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x91, 0x15);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x92, reg_92);
 
-	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xac, ~0x3f, 0x15); /* COLOR.RANGE */
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xad, 0x05); /* sharpness: low-pass filter */
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1e, 0x11); /* sharpness */
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1f, 0x01); /* sharpness */
+	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xac, ~0x3f, 0x15);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0xad, 0x05);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1e, 0x11);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x1f, 0x01);
 
 	for (k = 0; k < 24; k++)
 		u3hc_i2c_write(hdcap, ADDR_MST3367, 0x93 + k, csc[k]);
+
+	if (!comp)
+		u3hc_i2c_write(hdcap, ADDR_MST3367, 0xa7, limited ? 0x04 : 0x00);
 
 	/* RX_OUTPUT_YUV422 / 08.BITS / EMBEDDED SYNC */
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0xb0, 0xc2, 0x21);
@@ -428,8 +448,6 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 	int k, status;
 	int prev_htotal = -1, prev_vtotal = -1, prev_hactive = -1;
 	int stable_count = 0;
-
-	usb3hdcap_stream_ctl(hdcap, false, NULL, 0);
 
 	mst3367_enable_auto_position(hdcap);
 	msleep(100);
@@ -645,8 +663,6 @@ static int component_poll_signal(struct usb3hdcap *hdcap,
 	const struct component_mode *mode;
 	int k, status, vtotal, htotal;
 	int signal_count = 0;
-
-	usb3hdcap_stream_ctl(hdcap, false, NULL, 0);
 
 	/*
 	 * RxAdcModeDetect()

@@ -108,17 +108,6 @@ static int vendor_in(struct usb3hdcap *hdcap, u8 request, u16 value, u16 index,
 	return ret;
 }
 
-int usb3hdcap_stream_ctl(struct usb3hdcap *hdcap, bool enable, u8 *watch,
-			 u16 len)
-{
-	/* High byte sets whether the watched regs have to go through the MCU */
-	u16 index = (hdcap->has_mcu ? 0x0100 : 0) | (enable ? 0x01 : 0);
-
-	/* wValue 0x32 is from the Windows driver, maybe an interval in ms? */
-	return vendor_out(hdcap, REQ_STREAM, enable ? 0x0032 : 0x0000, index,
-			  watch, len);
-}
-
 /* ------------------------------------------------------------------ */
 /* MCU I2C tunnel (XCAPTURE-1)                                        */
 /*                                                                    */
@@ -258,32 +247,39 @@ static void usb3hdcap_probe_mcu(struct usb3hdcap *hdcap)
 		if (ret >= 0 && rx[0] == 1)
 			break;
 	}
-
-	if (k == 50) {
-		dev_info(hdcap->dev, "MCU not detected (GPIO timeout)\n");
-		return;
-	}
-
 	dev_dbg(hdcap->dev, "MCU freed, wait count=%d\n", k);
 
-	/* Send probe: magic {0x12, 0x34, 0x57} to MCU at I2C 0xAA */
-	ret = vendor_out(hdcap, REQ_I2C, 0x5066, 0, tx, sizeof(tx));
-	if (ret < 0)
-		return;
+	/* repeatedly send {0x12, 0x34, 0x57} until response received */
+	for (k = 0; k < 200; k++) {
+		ret = vendor_out(hdcap, REQ_I2C, 0x5066, 0, tx, sizeof(tx));
+		if (ret < 0)
+			return;
 
-	memset(rx, 0, sizeof(rx));
-	ret = vendor_in(hdcap, REQ_I2C, 0x5066, 0, rx, 3);
-	if (ret < 0)
-		return;
+		memset(rx, 0, sizeof(rx));
+		ret = vendor_in(hdcap, REQ_I2C, 0x5066, 0, rx, 3);
+		if (ret < 0)
+			return;
 
-	if (rx[0] == 'Q' && rx[1] == 0x10) {
-		hdcap->has_mcu = 1;
-		dev_info(hdcap->dev, "Nuvoton NUC100 MCU detected\n");
-	} else {
+		if (rx[0] == 'Q' && rx[1] == 0x10) {
+			hdcap->has_mcu = 1;
+			dev_info(hdcap->dev,
+				 "Nuvoton NUC100 MCU detected after %d tries\n",
+				 k + 1);
+			return;
+		}
+
+		/* still starting up, ask again in 100 ms */
+		if (rx[0] != 0x33 || rx[1] != 0x44 || rx[2] != 0x55)
+			break;
+		msleep(100);
+	}
+
+	if (k == 200)
+		dev_warn(hdcap->dev, "MCU never became ready\n");
+	else
 		dev_info(hdcap->dev,
 			 "Unrecognized MCU probe response: %02x %02x %02x\n",
 			 rx[0], rx[1], rx[2]);
-	}
 }
 
 /* Device-level init + GPIO pin state? shared between all inputs */
@@ -311,8 +307,6 @@ static int usb3hdcap_device_init(struct usb3hdcap *hdcap)
 	vendor_out(hdcap, REQ_UNK_C7, 0x0064, 0, NULL, 0);
 	/* Windows driver does this but is always fails? */
 	/* vendor_out(hdcap, 0xc5, 0x0000, 0, NULL, 0); */
-	usb3hdcap_stream_ctl(hdcap, false, NULL, 0);
-	usb3hdcap_stream_ctl(hdcap, false, NULL, 0);
 
 	/*
 	 * just replay what the windows driver does:
@@ -335,7 +329,6 @@ static int usb3hdcap_device_init(struct usb3hdcap *hdcap)
 	msleep(50);
 	vendor_out(hdcap, REQ_GPIO, 0x802d, 0, NULL, 0);
 
-	/* Probe for MCU after GPIO reset (XCAPTURE-1 only) */
 	if (!hdcap->has_mcu && is_xcapture)
 		usb3hdcap_probe_mcu(hdcap);
 
@@ -451,8 +444,11 @@ static int usb3hdcap_fmt_vid_cap(struct file *file, void *priv,
 	f->fmt.pix.field = interlaced ? V4L2_FIELD_ALTERNATE : V4L2_FIELD_NONE;
 	f->fmt.pix.bytesperline = width * 2;
 	f->fmt.pix.sizeimage = f->fmt.pix.bytesperline * height;
-	f->fmt.pix.colorspace = (hdcap->input == INPUT_HDMI) ?
-		V4L2_COLORSPACE_REC709 : V4L2_COLORSPACE_SMPTE170M;
+	if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO ||
+	    hdcap->mst_bt601)
+		f->fmt.pix.colorspace = V4L2_COLORSPACE_SMPTE170M;
+	else
+		f->fmt.pix.colorspace = V4L2_COLORSPACE_REC709;
 
 	return 0;
 }

@@ -231,7 +231,8 @@ static void usb3hdcap_iso_cb(struct urb *urb)
 
 resubmit:
 	ret = usb_submit_urb(urb, GFP_ATOMIC);
-	if (ret < 0)
+	/* endpoint going away when stopping is expected */
+	if (ret < 0 && ret != -ENOENT)
 		dev_warn(hdcap->dev, "ISO URB resubmit: %d\n", ret);
 }
 
@@ -327,13 +328,11 @@ static void usb3hdcap_stop(struct usb3hdcap *hdcap,
 {
 	unsigned long flags;
 
-	usb3hdcap_free_urbs(hdcap);
-
-	/* already NULL if this stop came from a disconnect */
-	if (hdcap->usb_dev) {
-		usb3hdcap_stream_ctl(hdcap, false, NULL, 0);
+	/* usb_dev is already NULL if this stop came from a disconnect */
+	if (hdcap->usb_dev)
 		usb_set_interface(hdcap->usb_dev, 0, 0);
-	}
+
+	usb3hdcap_free_urbs(hdcap);
 
 	/* Return any in-progress buffer */
 	if (hdcap->cur_buf) {
@@ -396,56 +395,8 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 	hdcap->is_second_field = 0;
 	hdcap->cur_buf = NULL;
 
-	if (hdcap->input == INPUT_HDMI) {
-		/*
-		 * this is a register watchlist, interrupt generated on endpoint 1 when
-		 * (value & mask) changes.
-		 *
-		 * struct reg_watch {
-		 *   uint8_t reg;
-		 *   // 0x80-0x82: MST3367 bank n&0x7f, 0x40: look at I2C addr
-		 *   uint8_t bank_or_source;
-		 *   uint8_t value_mask;
-		 *   uint8_t i2c_addr; // for bank_or_source == 0x40
-		 * };
-		 */
-		u8 stream_payload[] = {
-			0x55, 0x80, 0x3c, 0x00,  0x6a, 0x80, 0x0f, 0x00,
-			0x6b, 0x80, 0xfe, 0x00,  0x57, 0x80, 0x3f, 0x00,
-			0x58, 0x80, 0x80, 0x00,  0x59, 0x80, 0x3f, 0x00,
-			0x5a, 0x80, 0xf0, 0x00,  0x5b, 0x80, 0x07, 0x00,
-			0x5c, 0x80, 0xfe, 0x00,  0x5f, 0x80, 0x02, 0x00,
-			0x01, 0x81, 0x07, 0x00,  0x29, 0x82, 0x1f, 0x00,
-			0x28, 0x82, 0xff, 0x00,  0x0b, 0x82, 0xdf, 0x00,
-			0x0c, 0x82, 0x3f, 0x00,  0x0e, 0x82, 0x08, 0x00,
-			0x48, 0x82, 0x60, 0x00,  0x9b, 0x82, 0xf0, 0x00,
-			0x11, 0x82, 0xff, 0x00,  0x12, 0x82, 0xff, 0x00,
-			0x11, 0x82, 0xff, 0x00,  0x12, 0x82, 0xff, 0x00,
-		};
-		ret = usb3hdcap_stream_ctl(hdcap, true, stream_payload,
-					   sizeof(stream_payload));
-	} else if (hdcap->input == INPUT_COMPONENT) {
-		u8 stream_payload[] = {
-			0x14, 0x80, 0x90, 0x00,  0x15, 0x80, 0x46, 0x00,
-			0x5b, 0x80, 0x07, 0x00,  0x5c, 0x80, 0xf8, 0x00,
-			0x57, 0x80, 0x3f, 0x00,  0x5f, 0x80, 0x12, 0x00,
-			0x11, 0x82, 0xff, 0x00,  0x12, 0x82, 0xff, 0x00,
-		};
-		ret = usb3hdcap_stream_ctl(hdcap, true, stream_payload,
-					   sizeof(stream_payload));
-	} else {
-		u8 stream_payload[] = {
-			0x01, 0x40, 0xe9, 0x88,
-			0x1c, 0x40, 0xf0, 0x88,
-			0x30, 0x40, 0x0f, 0x88,
-		};
+	if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)
 		v4l2_ctrl_handler_setup(&hdcap->ctrl);
-		ret = usb3hdcap_stream_ctl(hdcap, true, stream_payload,
-					   sizeof(stream_payload));
-	}
-
-	if (ret < 0)
-		goto fail;
 
 	/*
 	 * Select alt setting based on bandwidth:

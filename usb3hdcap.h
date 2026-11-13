@@ -107,7 +107,7 @@ enum usb3hdcap_input {
 #define REQ_I2C    0xc0
 #define REQ_GPIO   0xc1
 #define REQ_INIT   0xc2
-#define REQ_STREAM 0xc6
+#define REQ_WATCH  0xc6
 #define REQ_UNK_C7 0xc7
 #define REQ_UNK_EC 0xec
 
@@ -195,6 +195,7 @@ struct usb3hdcap {
 
 	/* MST3367 state */
 	int mst_current_bank;
+	bool mst_bt601;
 	struct v4l2_dv_timings detected_timings;
 	int detected_timings_present;
 	struct v4l2_dv_timings requested_timings;
@@ -222,8 +223,6 @@ struct usb3hdcap {
 /* USB control helpers (usb3hdcap-core.c) */
 int vendor_out(struct usb3hdcap *hdcap, u8 request, u16 value, u16 index,
 	       u8 *data, u16 len);
-int usb3hdcap_stream_ctl(struct usb3hdcap *hdcap, bool enable, u8 *watch,
-			 u16 len);
 int u3hc_i2c_write(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 val);
 int u3hc_i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg);
 int u3hc_i2c_rmw(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits);
