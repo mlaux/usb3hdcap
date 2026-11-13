@@ -93,7 +93,7 @@ int usb3hdcap_composite_init(struct usb3hdcap *hdcap)
 		u3hc_i2c_write(hdcap, ADDR_CPLD, 0x3b, 0x80);
 	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x05);
 	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x00, 0x01);
-	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x10, 0xfe);
+	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x10, hdcap->has_mcu ? 0xfc : 0xfe);
 	u3hc_i2c_write(hdcap, ADDR_CPLD, 0x20, 0x75);
 
 	/* Main TW9900 configuration */

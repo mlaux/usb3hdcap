@@ -46,10 +46,6 @@
 
 #include "usb3hdcap.h"
 
-#define USB3HDCAP_VID 0x1164
-#define USB3HDCAP_PID 0xf533
-#define XCAPTURE1_PID 0xf531
-
 /* ------------------------------------------------------------------ */
 /* USB control transfer helpers                                       */
 /* ------------------------------------------------------------------ */

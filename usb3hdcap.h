@@ -99,6 +99,10 @@ enum usb3hdcap_input {
 #define CS53L21_CH_MIXER     0x18
 #define CS53L21_ALC_EN_ATK   0x1c
 
+#define USB3HDCAP_VID 0x1164
+#define USB3HDCAP_PID 0xf533
+#define XCAPTURE1_PID 0xf531
+
 /* Vendor request codes */
 #define REQ_I2C    0xc0
 #define REQ_GPIO   0xc1

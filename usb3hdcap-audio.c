@@ -174,7 +174,22 @@ out:
 
 int usb3hdcap_cs53l21_init(struct usb3hdcap *hdcap)
 {
+	bool is_xcapture =
+		le16_to_cpu(hdcap->usb_dev->descriptor.idProduct) == XCAPTURE1_PID;
+	u8 in_sel = 0x00;
+	u8 ch_mixer = 0x00;
 	int ret;
+
+	if (is_xcapture) {
+		/* 
+		 * composite/S-Video audio is on AIN2A/AIN2B, and for the other inputs
+	 	 * the ADC channels are swapped
+		 */
+		if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)
+			in_sel = 0x50;
+		else
+			ch_mixer = 0x0f;
+	}
 
 	/* MIC power control: power down mic B, mic A, and bias */
 	/* SPEED = "10 - Half-Speed Mode (HSM) - 12.5 to 25 kHz sample rates" */
@@ -187,8 +202,8 @@ int usb3hdcap_cs53l21_init(struct usb3hdcap *hdcap)
 	if (ret)
 		return ret;
 
-	/* ADC input select: default */
-	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ADC_IN_SEL, 0x00);
+	/* ADC input select: AIN1x, or AIN2x for XCAPTURE-1 SD inputs */
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_ADC_IN_SEL, in_sel);
 	if (ret)
 		return ret;
 
@@ -231,8 +246,8 @@ int usb3hdcap_cs53l21_init(struct usb3hdcap *hdcap)
 	if (ret)
 		return ret;
 
-	/* channel mixer: off */
-	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_CH_MIXER, 0x00);
+	/* channel mixer: off, or ADCA/ADCB swapped */
+	ret = u3hc_i2c_write(hdcap, ADDR_CS53L21, CS53L21_CH_MIXER, ch_mixer);
 	if (ret)
 		return ret;
 
