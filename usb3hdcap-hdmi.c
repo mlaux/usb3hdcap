@@ -5,21 +5,42 @@
 
 #include <linux/kernel.h>
 #include <linux/delay.h>
+#include <linux/math64.h>
 #include <linux/usb.h>
 #include <linux/v4l2-dv-timings.h>
 #include <media/v4l2-ctrls.h>
+#include <media/v4l2-dv-timings.h>
 
 #include "usb3hdcap.h"
+
+
+const struct v4l2_dv_timings_cap usb3hdcap_hdmi_timings_cap = {
+	.type = V4L2_DV_BT_656_1120,
+	.bt = {
+		.min_width = 640,
+		.max_width = 1920,
+		.min_height = 480,
+		.max_height = 1080,
+		.min_pixelclock = 25175000, /* 640x480p60 */
+		.max_pixelclock = 148500000, /* 1080p60 */
+		.standards = V4L2_DV_BT_STD_CEA861 | V4L2_DV_BT_STD_DMT,
+		.capabilities = V4L2_DV_BT_CAP_PROGRESSIVE |
+				V4L2_DV_BT_CAP_INTERLACED,
+	},
+};
+
+int usb3hdcap_hdmi_enum_dv_timings(struct v4l2_enum_dv_timings *timings)
+{
+	return v4l2_enum_dv_timings_cap(timings, &usb3hdcap_hdmi_timings_cap,
+					NULL, NULL);
+}
 
 /* ------------------------------------------------------------------ */
 /* Component scaler mode table                                        */
 /* ------------------------------------------------------------------ */
 
 struct component_mode {
-	int vtotal_min, vtotal_max;
-	int width, height;
 	int refresh_rate;
-	int interlaced;
 	/* MST3367 bank 0 ADC/scaler registers (ref: SetADParameters) */
 	u8 pllgain, clpdly, clpdur, hsopw;
 	u8 adc_bw0, adc_bw1;
@@ -29,76 +50,102 @@ struct component_mode {
 	struct v4l2_dv_timings timings;
 };
 
+#define U3HC_DV_BT_CEA_720X240P59_94 { \
+	.type = V4L2_DV_BT_656_1120, \
+	V4L2_INIT_BT_TIMINGS(720, 240, 0, 0, \
+		13500000, 19, 62, 57, 4, 3, 15, 0, 0, 0, \
+		V4L2_DV_BT_STD_CEA861, \
+		V4L2_DV_FL_IS_CE_VIDEO | V4L2_DV_FL_HAS_PICTURE_ASPECT | \
+		V4L2_DV_FL_HAS_CEA861_VIC, { 4, 3 }, 8) \
+}
+
+#define U3HC_DV_BT_CEA_720X288P50 { \
+	.type = V4L2_DV_BT_656_1120, \
+	V4L2_INIT_BT_TIMINGS(720, 288, 0, 0, \
+		13500000, 12, 63, 69, 2, 3, 19, 0, 0, 0, \
+		V4L2_DV_BT_STD_CEA861, \
+		V4L2_DV_FL_IS_CE_VIDEO | V4L2_DV_FL_HAS_PICTURE_ASPECT | \
+		V4L2_DV_FL_HAS_CEA861_VIC, { 4, 3 }, 23) \
+}
+
 /*
- * Values from Windows driver table $140303810
- * TODO: add 50Hz variants
- *
- * The hardware supports 240p over component (one of the great things about
- * this card), but the Windows driver doesn't attempt to distinguish. I
- * won't either
+ * Values from Windows driver table $140303810 + 240p and 288p
  */
 static const struct component_mode component_modes[] = {
-	/*                                pll   clp   clp   hsop  adc   adc                    */
-	/*                                gain  dly   dur   w     bw0   bw1   sclht  hde   vde */
-	/* 480i */
-	{  250,  275,   720,  240, 60, 1, 0x08, 0x08, 0x08, 0x18, 0x44, 0x04, 0x35a, 0x76, 0x12,
-	   V4L2_DV_BT_CEA_720X480I59_94 },
-	/* 576i */
-	{  300,  320,   720,  288, 50, 1, 0x08, 0x08, 0x08, 0x18, 0x44, 0x04, 0x360, 0x83, 0x16,
-	   V4L2_DV_BT_CEA_720X576I50 },
-	/* 480p */
-	{  515,  535,   720,  480, 60, 0, 0x20, 0x08, 0x08, 0x18, 0x33, 0x03, 0x35a, 0x79, 0x24,
-	   V4L2_DV_BT_CEA_720X480P59_94 },
-	/* 1080i */
-	{  555,  585,  1920,  540, 60, 1, 0x58, 0x38, 0x20, 0x30, 0x11, 0x01, 0x898, 0xeb, 0x14,
-	   V4L2_DV_BT_CEA_1920X1080I60 },
-	/* 576p */
-	{  615,  635,   720,  576, 50, 0, 0x18, 0x08, 0x08, 0x18, 0x33, 0x03, 0x360, 0x83, 0x2c,
-	   V4L2_DV_BT_CEA_720X576P50 },
-	/* 720p */
-	{  740,  760,  1280,  720, 60, 0, 0x58, 0x38, 0x20, 0x30, 0x11, 0x01, 0x672, 0x12b, 0x19,
-	   V4L2_DV_BT_CEA_1280X720P60 },
-	/* 1080p */
-	{ 1115, 1135,  1920, 1080, 60, 0, 0xe8, 0x38, 0x30, 0xa0, 0x00, 0x00, 0x898, 0xc1, 0x29,
-	   V4L2_DV_BT_CEA_1920X1080P60 },
+	/*    pll   clp   clp   hsop  adc   adc                     */
+	/*Hz  gain  dly   dur   w     bw0   bw1   sclht  hde    vde */
+	{ 60, 0x08, 0x08, 0x08, 0x18, 0x44, 0x04, 0x35a, 0x076, 0x12,
+	  V4L2_DV_BT_CEA_720X480I59_94 },
+	{ 60, 0x08, 0x08, 0x08, 0x18, 0x44, 0x04, 0x35a, 0x077, 0x13,
+	  U3HC_DV_BT_CEA_720X240P59_94 },
+	{ 50, 0x08, 0x08, 0x08, 0x18, 0x44, 0x04, 0x360, 0x083, 0x16,
+	  V4L2_DV_BT_CEA_720X576I50 },
+	{ 50, 0x08, 0x08, 0x08, 0x18, 0x44, 0x04, 0x360, 0x083, 0x17,
+	  U3HC_DV_BT_CEA_720X288P50 },
+	{ 60, 0x20, 0x08, 0x08, 0x18, 0x33, 0x03, 0x35a, 0x079, 0x24,
+	  V4L2_DV_BT_CEA_720X480P59_94 },
+	{ 50, 0x18, 0x08, 0x08, 0x18, 0x33, 0x03, 0x360, 0x083, 0x2c,
+	  V4L2_DV_BT_CEA_720X576P50 },
+	{ 24, 0x58, 0x38, 0x20, 0x30, 0x11, 0x01, 0xce4, 0x12b, 0x19,
+	  V4L2_DV_BT_CEA_1280X720P24 },
+	{ 25, 0x58, 0x38, 0x20, 0x30, 0x11, 0x01, 0xf78, 0x12b, 0x19,
+	  V4L2_DV_BT_CEA_1280X720P25 },
+	{ 30, 0x58, 0x38, 0x20, 0x30, 0x11, 0x01, 0xce4, 0x12b, 0x19,
+	  V4L2_DV_BT_CEA_1280X720P30 },
+	{ 50, 0x58, 0x38, 0x20, 0x30, 0x11, 0x01, 0x7bc, 0x12b, 0x19,
+	  V4L2_DV_BT_CEA_1280X720P50 },
+	{ 60, 0x58, 0x38, 0x20, 0x30, 0x11, 0x01, 0x672, 0x12b, 0x19,
+	  V4L2_DV_BT_CEA_1280X720P60 },
+	{ 50, 0x58, 0x38, 0x20, 0x30, 0x11, 0x01, 0xa50, 0x0eb, 0x14,
+	  V4L2_DV_BT_CEA_1920X1080I50 },
+	{ 60, 0x58, 0x38, 0x20, 0x30, 0x11, 0x01, 0x898, 0x0eb, 0x14,
+	  V4L2_DV_BT_CEA_1920X1080I60 },
+	{ 24, 0xe8, 0x38, 0x30, 0x60, 0x00, 0x00, 0xabe, 0x0eb, 0x29,
+	  V4L2_DV_BT_CEA_1920X1080P24 },
+	{ 25, 0xe8, 0x38, 0x30, 0x60, 0x00, 0x00, 0xa50, 0x0eb, 0x29,
+	  V4L2_DV_BT_CEA_1920X1080P25 },
+	{ 30, 0xe8, 0x38, 0x30, 0x60, 0x00, 0x00, 0x898, 0x0eb, 0x29,
+	  V4L2_DV_BT_CEA_1920X1080P30 },
+	{ 50, 0xe8, 0x38, 0x30, 0x60, 0x00, 0x00, 0xa50, 0x0eb, 0x29,
+	  V4L2_DV_BT_CEA_1920X1080P50 },
+	{ 60, 0xe8, 0x38, 0x30, 0x60, 0x00, 0x00, 0x898, 0x0eb, 0x29,
+	  V4L2_DV_BT_CEA_1920X1080P60 },
 };
 
-/*
- * Known CEA timing table - maps (htotal, vtotal, hactive) to full
- * v4l2_dv_timings. HD htotal = standard * 1.5 (MST3367 counter rate?)
- */
-struct hdmi_std {
-	int htotal_min, htotal_max;
-	int vtotal_min, vtotal_max;
-	int hactive;
-	struct v4l2_dv_timings timings;
+const struct v4l2_dv_timings_cap usb3hdcap_component_timings_cap = {
+	.type = V4L2_DV_BT_656_1120,
+	.bt = {
+		.min_width = 720,
+		.max_width = 1920,
+		.min_height = 240,
+		.max_height = 1080,
+		.min_pixelclock = 13500000, /* 480i */
+		.max_pixelclock = 148500000, /* 1080p60 */
+		.standards = V4L2_DV_BT_STD_CEA861,
+		.capabilities = V4L2_DV_BT_CAP_PROGRESSIVE |
+				V4L2_DV_BT_CAP_INTERLACED,
+	},
 };
 
-static const struct hdmi_std hdmi_stds[] = {
-	/*  htotal      vtotal     ha */
-	{  790,  810,  520,  530,  640, V4L2_DV_BT_CEA_640X480P59_94 },
-	{  848,  868,  520,  530,  720, V4L2_DV_BT_CEA_720X480P59_94 },
-	{  854,  874,  620,  630,  720, V4L2_DV_BT_CEA_720X576P50 },
-	{ 2960, 2980,  745,  755, 1280, V4L2_DV_BT_CEA_1280X720P50 },
-	{ 1640, 1660,  745,  755, 1280, V4L2_DV_BT_CEA_1280X720P60 },
-	{ 2465, 2485,  745,  755, 1280, V4L2_DV_BT_CEA_1280X720P60 },
-	/* VESA DMT modes */
-	{ 1790, 1810,  995, 1005, 1280, V4L2_DV_BT_DMT_1280X960P60 },
-	{ 1678, 1698, 1061, 1071, 1280, V4L2_DV_BT_DMT_1280X1024P60 },
-	/*
-	 * not sure about this one. it matches the timings for 30, but my laptop
-	 * claims to be outputting 60...
-	 */
-	{ 2740, 2760, 1120, 1130, 1920, V4L2_DV_BT_CEA_1920X1080P30 },
-	{ 3290, 3310,  555,  570, 1920, V4L2_DV_BT_CEA_1920X1080I60 },
-	{ 3950, 3970, 1120, 1130, 1920, V4L2_DV_BT_CEA_1920X1080P50 },
-	{ 2190, 2210, 1120, 1130, 1920, V4L2_DV_BT_CEA_1920X1080P60 },
-	{ 3290, 3310, 1120, 1130, 1920, V4L2_DV_BT_CEA_1920X1080P60 },
-};
+int usb3hdcap_component_enum_dv_timings(struct v4l2_enum_dv_timings *timings)
+{
+	if (timings->index >= ARRAY_SIZE(component_modes))
+		return -EINVAL;
 
-/* ------------------------------------------------------------------ */
-/* MST3367 bank select helper                                         */
-/* ------------------------------------------------------------------ */
+	timings->timings = component_modes[timings->index].timings;
+	return 0;
+}
+
+bool usb3hdcap_component_timings_supported(const struct v4l2_dv_timings *t,
+					   void *handle)
+{
+	int k;
+
+	for (k = 0; k < ARRAY_SIZE(component_modes); k++)
+		if (v4l2_match_dv_timings(t, &component_modes[k].timings, 0, false))
+			return true;
+	return false;
+}
 
 static int mst_bank(struct usb3hdcap *hdcap, int bank)
 {
@@ -107,10 +154,6 @@ static int mst_bank(struct usb3hdcap *hdcap, int bank)
 	hdcap->mst_current_bank = bank;
 	return u3hc_i2c_write(hdcap, ADDR_MST3367, 0x00, bank);
 }
-
-/* ------------------------------------------------------------------ */
-/* MST3367 register configuration                                     */
-/* ------------------------------------------------------------------ */
 
 static void mst3367_config(struct usb3hdcap *hdcap)
 {
@@ -229,10 +272,6 @@ static void mst3367_config(struct usb3hdcap *hdcap)
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x00, 0x7f, 0x00);
 	mst_bank(hdcap, 0x00);
 }
-
-/* ------------------------------------------------------------------ */
-/* CPLD init + poll helper                                            */
-/* ------------------------------------------------------------------ */
 
 static void cpld_init(struct usb3hdcap *hdcap, u8 mux_val)
 {
@@ -414,23 +453,62 @@ void mst3367_write_csc(struct usb3hdcap *hdcap)
 /* Signal detection polling                                           */
 /* ------------------------------------------------------------------ */
 
-static const struct v4l2_dv_timings *match_hdmi_timing(int htotal, int vtotal,
-						       int hactive)
+#define HDMI_VTOTAL_TOLERANCE	5
+#define HDMI_VFREQ_TOLERANCE	5
+
+static int mst3367_read_vfreq(struct usb3hdcap *hdcap)
 {
+	int hi, lo, period;
+
+	mst_bank(hdcap, 0x00);
+	hi = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x59);
+	lo = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5a);
+	if (hi < 0 || lo < 0)
+		return 0;
+
+	period = (hi & 0x3f) << 8 | lo;
+	/* units of 0.1 Hz, ref: RxHdmiModeDetect */
+	return period ? 1250000 / period : 0;
+}
+
+static const struct v4l2_dv_timings *match_hdmi_timing(int hactive, int vtotal,
+						       int vfreq)
+{
+	const struct v4l2_dv_timings *best = NULL;
+	int best_err = INT_MAX;
 	int k;
 
-	for (k = 0; k < ARRAY_SIZE(hdmi_stds); k++) {
-		const struct hdmi_std *s = &hdmi_stds[k];
+	for (k = 0; v4l2_dv_timings_presets[k].bt.width; k++) {
+		const struct v4l2_dv_timings *t = &v4l2_dv_timings_presets[k];
+		const struct v4l2_bt_timings *bt = &t->bt;
+		u32 frame_width = V4L2_DV_BT_FRAME_WIDTH(bt);
+		u32 frame_height = V4L2_DV_BT_FRAME_HEIGHT(bt);
+		int fields = bt->interlaced ? 2 : 1;
+		int vtotal_err, vfreq_err, err;
 
-		if (htotal < s->htotal_min || htotal > s->htotal_max)
+		if (bt->width != hactive)
 			continue;
-		if (vtotal < s->vtotal_min || vtotal > s->vtotal_max)
+		if (!v4l2_valid_dv_timings(t, &usb3hdcap_hdmi_timings_cap,
+					   NULL, NULL))
 			continue;
-		if (hactive != s->hactive)
+
+		vtotal_err = abs(vtotal * fields - (int) frame_height);
+		if (vtotal_err > HDMI_VTOTAL_TOLERANCE)
 			continue;
-		return &s->timings;
+
+		vfreq_err = abs(vfreq -
+				(int) DIV_ROUND_CLOSEST_ULL(bt->pixelclock * 10 * fields,
+							   frame_width * frame_height));
+		if (vfreq_err > HDMI_VFREQ_TOLERANCE)
+			continue;
+
+		err = vtotal_err * 2 * HDMI_VFREQ_TOLERANCE + vfreq_err;
+		if (err < best_err) {
+			best_err = err;
+			best = t;
+		}
 	}
-	return NULL;
+	return best;
 }
 
 static void mst3367_enable_auto_position(struct usb3hdcap *hdcap)
@@ -453,7 +531,7 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 	msleep(100);
 
 	for (k = 0; k < 100; k++) {
-		int htotal, vtotal, hactive;
+		int htotal, vtotal, hactive, vfreq, tmds_ratio;
 		const struct v4l2_dv_timings *std;
 
 		msleep(100);
@@ -505,17 +583,28 @@ static int hdmi_poll_signal(struct usb3hdcap *hdcap)
 		if (++stable_count < 2)
 			continue;
 
-		dev_info(hdcap->dev,
-				"HDMI locked: htotal=%d vtotal=%d hactive=%d\n",
-				htotal, vtotal, hactive);
+		vfreq = mst3367_read_vfreq(hdcap);
 
-		std = match_hdmi_timing(htotal, vtotal, hactive);
+		dev_info(hdcap->dev,
+			 "HDMI locked: htotal=%d vtotal=%d hactive=%d vfreq=%d.%d\n",
+			 htotal, vtotal, hactive, vfreq / 10, vfreq % 10);
+
+		std = match_hdmi_timing(hactive, vtotal, vfreq);
 		if (!std) {
 			dev_err(hdcap->dev,
-				"unsupported HDMI timing: htotal=%d vtotal=%d hactive=%d\n",
-				htotal, vtotal, hactive);
+				"unsupported HDMI timing: htotal=%d vtotal=%d hactive=%d vfreq=%d.%d\n",
+				htotal, vtotal, hactive, vfreq / 10, vfreq % 10);
 			return -ERANGE;
 		}
+
+		/* 100 = 8 bit, 125 = 10 bit, 150 = 12 bit deep color */
+		tmds_ratio = htotal * 100 / V4L2_DV_BT_FRAME_WIDTH(&std->bt);
+		dev_info(hdcap->dev,
+			 "HDMI mode: %ux%u%s, TMDS clock = %d.%02dx pixel clock\n",
+			 std->bt.width, std->bt.height,
+			 std->bt.interlaced ? "i" : "p",
+			 tmds_ratio / 100, tmds_ratio % 100);
+
 		hdcap->detected_timings = *std;
 		hdcap->detected_timings_present = 1;
 		hdcap->std = 0; /* no SD standard */
@@ -557,18 +646,42 @@ static void mst3367_adc_config(struct usb3hdcap *hdcap)
 	u3hc_i2c_rmw(hdcap, ADDR_MST3367, 0x0e, 0xcf, 0x30);
 }
 
-static const struct component_mode *match_component_mode(int vtotal)
+#define COMPONENT_VTOTAL_TOLERANCE	25
+#define COMPONENT_HFREQ_TOLERANCE	8
+
+/* Picks the mode closest to the measured line count and line rate */
+static const struct component_mode *match_component_mode(int vtotal, int hfreq,
+							 bool interlaced)
 {
+	const struct component_mode *best = NULL;
+	int best_err = INT_MAX;
 	int k;
 
 	for (k = 0; k < ARRAY_SIZE(component_modes); k++) {
 		const struct component_mode *m = &component_modes[k];
+		const struct v4l2_bt_timings *bt = &m->timings.bt;
+		int std_vtotal = V4L2_DV_BT_FRAME_HEIGHT(bt) /
+				 (bt->interlaced ? 2 : 1);
+		int std_hfreq = (u32) bt->pixelclock /
+				(V4L2_DV_BT_FRAME_WIDTH(bt) * 100);
+		int vtotal_err = abs(vtotal - std_vtotal);
+		int hfreq_err = abs(hfreq - std_hfreq);
+		int err;
 
-		if (vtotal < m->vtotal_min || vtotal > m->vtotal_max)
+		if (vtotal_err > COMPONENT_VTOTAL_TOLERANCE ||
+		    hfreq_err > COMPONENT_HFREQ_TOLERANCE)
 			continue;
-		return m;
+
+		err = vtotal_err + hfreq_err;
+		if (!bt->interlaced != !interlaced)
+			err += COMPONENT_VTOTAL_TOLERANCE +
+			       COMPONENT_HFREQ_TOLERANCE + 1;
+		if (err < best_err) {
+			best_err = err;
+			best = m;
+		}
 	}
-	return NULL;
+	return best;
 }
 
 /* ------------------------------------------------------------------ */
@@ -578,8 +691,11 @@ static const struct component_mode *match_component_mode(int vtotal)
 static void component_write_scaler(struct usb3hdcap *hdcap,
 				   const struct component_mode *m)
 {
+	const struct v4l2_bt_timings *bt = &m->timings.bt;
+	int width = bt->width;
+	int height = bt->interlaced ? bt->height / 2 : bt->height;
 	int ht = m->scaler_htotal - 1;
-	int is_720_low_rr = m->width == 1280 && m->height == 720 &&
+	int is_720_low_rr = width == 1280 && height == 720 &&
 			(m->refresh_rate == 24 ||
 				m->refresh_rate == 25 ||
 				m->refresh_rate == 30);
@@ -632,12 +748,12 @@ static void component_write_scaler(struct usb3hdcap *hdcap,
 	/* output data enable start pos after sync */
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x80, (m->hde_off >> 8) & 0x0f);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x81, m->hde_off & 0xff);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x82, (m->width >> 8) & 0xff);
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x83, m->width & 0xff);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x82, (width >> 8) & 0xff);
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x83, width & 0xff);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x84, m->vde_off);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x85,
-		       ((m->height >> 8) & 0x0f) | (m->interlaced ? 0x20 : 0x00));
-	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x86, m->height & 0xff);
+		       ((height >> 8) & 0x0f) | (bt->interlaced ? 0x20 : 0x00));
+	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x86, height & 0xff);
 
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2d, 0x11);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x2e, 0x11);
@@ -661,7 +777,7 @@ static int component_poll_signal(struct usb3hdcap *hdcap,
 				 const struct component_mode **detected)
 {
 	const struct component_mode *mode;
-	int k, status, vtotal, htotal;
+	int k, status, vtotal, hperiod, hfreq, interlaced;
 	int signal_count = 0;
 
 	/*
@@ -690,14 +806,13 @@ static int component_poll_signal(struct usb3hdcap *hdcap,
 		else
 			signal_count = 0;
 
-		/* Read H period */
-		htotal = ((u3hc_i2c_read(hdcap, ADDR_MST3367, 0x57) & 0x3f) << 8) |
-			  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x58);
+		hperiod = ((u3hc_i2c_read(hdcap, ADDR_MST3367, 0x57) & 0x3f) << 8) |
+			   u3hc_i2c_read(hdcap, ADDR_MST3367, 0x58);
 
 		/* scale ADC sample rate to H period */
-		if (htotal > 0)
+		if (hperiod > 0)
 			u3hc_i2c_write(hdcap, ADDR_MST3367, 0x11,
-				       (htotal < 0x401 ? 0x400 : htotal) >> 7);
+				       (hperiod < 0x401 ? 0x400 : hperiod) >> 7);
 
 		/* V period (timer counts) */
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x59);
@@ -710,7 +825,8 @@ static int component_poll_signal(struct usb3hdcap *hdcap,
 		/* H total (pixels), interlace flag */
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5d);
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5e);
-		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5f);
+		interlaced = u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5f);
+		interlaced = interlaced < 0 ? 0 : !!(interlaced & 0x02);
 
 		mst_bank(hdcap, 0x02);
 		u3hc_i2c_read(hdcap, ADDR_MST3367, 0x11);
@@ -732,20 +848,25 @@ static int component_poll_signal(struct usb3hdcap *hdcap,
 		vtotal = ((u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5b) & 0x07) << 8) |
 			  u3hc_i2c_read(hdcap, ADDR_MST3367, 0x5c);
 
-		dev_info(hdcap->dev,
-			 "component locked: vtotal=%d htotal=%d 0x14=0x%02x\n",
-			 vtotal, htotal, status);
+		/* units are 0.1 kHz, ref: RxAdcModeDetect */
+		hfreq = hperiod > 0 ? 1600000 / hperiod : 0;
 
-		mode = match_component_mode(vtotal);
+		dev_info(hdcap->dev,
+			 "component locked: vtotal=%d hfreq=%d.%d kHz %s 0x14=0x%02x\n",
+			 vtotal, hfreq / 10, hfreq % 10,
+			 interlaced ? "interlaced" : "progressive", status);
+
+		mode = match_component_mode(vtotal, hfreq, interlaced);
 		if (!mode) {
 			dev_err(hdcap->dev,
-				"unsupported component timing: vtotal=%d\n",
-				vtotal);
+				"unsupported component timing: vtotal=%d hfreq=%d.%d kHz\n",
+				vtotal, hfreq / 10, hfreq % 10);
 			return -ERANGE;
 		}
-		hdcap->width = mode->width;
-		hdcap->height = mode->height;
-		hdcap->interlaced = mode->interlaced;
+		hdcap->width = mode->timings.bt.width;
+		hdcap->interlaced = mode->timings.bt.interlaced;
+		hdcap->height = hdcap->interlaced ? mode->timings.bt.height / 2 :
+						    mode->timings.bt.height;
 		hdcap->bpl = hdcap->width * 2;
 		hdcap->std = 0; /* no SD standard */
 		hdcap->detected_timings_present = 1;

@@ -181,9 +181,9 @@ int usb3hdcap_cs53l21_init(struct usb3hdcap *hdcap)
 	int ret;
 
 	if (is_xcapture) {
-		/* 
+		/*
 		 * composite/S-Video audio is on AIN2A/AIN2B, and for the other inputs
-	 	 * the ADC channels are swapped
+		 * the ADC channels are swapped
 		 */
 		if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)
 			in_sel = 0x50;

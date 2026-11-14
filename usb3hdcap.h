@@ -186,7 +186,8 @@ struct usb3hdcap {
 	int frame_line;
 	int synced;
 	int was_blanking;
-	int is_second_field;
+	/* BT.656 F bit of the field being captured */
+	u8 field_f;
 
 	/* hardware init state */
 	int hw_inited;
@@ -229,6 +230,12 @@ int usb3hdcap_composite_init(struct usb3hdcap *hdcap);
 /* HDMI + Component (usb3hdcap-hdmi.c) */
 int usb3hdcap_hdmi_init(struct usb3hdcap *hdcap);
 int usb3hdcap_component_init(struct usb3hdcap *hdcap);
+extern const struct v4l2_dv_timings_cap usb3hdcap_hdmi_timings_cap;
+extern const struct v4l2_dv_timings_cap usb3hdcap_component_timings_cap;
+int usb3hdcap_hdmi_enum_dv_timings(struct v4l2_enum_dv_timings *timings);
+int usb3hdcap_component_enum_dv_timings(struct v4l2_enum_dv_timings *timings);
+bool usb3hdcap_component_timings_supported(const struct v4l2_dv_timings *t,
+					   void *handle);
 void mst3367_write_csc(struct usb3hdcap *hdcap);
 
 /* Video/streaming (usb3hdcap-video.c) */

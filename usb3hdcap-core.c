@@ -38,7 +38,7 @@
 #include <linux/vmalloc.h>
 #include <linux/mutex.h>
 #include <media/v4l2-common.h>
-#include <linux/v4l2-dv-timings.h>
+#include <media/v4l2-dv-timings.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-ioctl.h>
 #include <media/videobuf2-vmalloc.h>
@@ -489,38 +489,6 @@ static int usb3hdcap_s_std(struct file *file, void *priv, v4l2_std_id norm)
 /* DV timings (HDMI + HD component)                                   */
 /* ------------------------------------------------------------------ */
 
-static const struct v4l2_dv_timings_cap usb3hdcap_timings_cap = {
-	.type = V4L2_DV_BT_656_1120,
-	.bt = {
-		.min_width = 720,
-		.max_width = 1920,
-		.min_height = 480,
-		.max_height = 1080,
-		.min_pixelclock = 13500000, /* 480i */
-		.max_pixelclock = 148500000, /* 1080p60 */
-		.standards = V4L2_DV_BT_STD_CEA861,
-		.capabilities = V4L2_DV_BT_CAP_PROGRESSIVE |
-				V4L2_DV_BT_CAP_INTERLACED,
-	},
-};
-
-static const struct v4l2_dv_timings all_supported_dv_timings[] = {
-	/* component only */
-	V4L2_DV_BT_CEA_720X480I59_94,
-	V4L2_DV_BT_CEA_720X576I50,
-	V4L2_DV_BT_CEA_1920X1080I60,
-
-	/* hdmi only */
-	V4L2_DV_BT_CEA_640X480P59_94,
-	V4L2_DV_BT_CEA_1280X720P50,
-
-	/* both */
-	V4L2_DV_BT_CEA_720X480P59_94,
-	V4L2_DV_BT_CEA_720X576P50,
-	V4L2_DV_BT_CEA_1280X720P60,
-	V4L2_DV_BT_CEA_1920X1080P60,
-};
-
 static int usb3hdcap_g_dv_timings(struct file *file, void *priv,
 				  struct v4l2_dv_timings *timings)
 {
@@ -545,12 +513,35 @@ static int usb3hdcap_s_dv_timings(struct file *file, void *priv,
 				  struct v4l2_dv_timings *timings)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
+	bool valid;
 
-	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
+	if (hdcap->input == INPUT_COMPONENT)
+		valid = v4l2_valid_dv_timings(timings,
+					      &usb3hdcap_component_timings_cap,
+					      usb3hdcap_component_timings_supported,
+					      NULL);
+	else if (hdcap->input == INPUT_HDMI)
+		valid = v4l2_valid_dv_timings(timings,
+					      &usb3hdcap_hdmi_timings_cap,
+					      NULL, NULL);
+	else
 		return -ENODATA;
 
-	if (vb2_is_busy(&hdcap->vb2q))
+	if (!valid)
+		return -ERANGE;
+
+	if (vb2_is_busy(&hdcap->vb2q)) {
+		const struct v4l2_dv_timings *cur = NULL;
+
+		if (hdcap->requested_timings_present)
+			cur = &hdcap->requested_timings;
+		else if (hdcap->detected_timings_present)
+			cur = &hdcap->detected_timings;
+
+		if (cur && v4l2_match_dv_timings(timings, cur, 0, false))
+			return 0;
 		return -EBUSY;
+	}
 
 	hdcap->requested_timings = *timings;
 	hdcap->requested_timings_present = 1;
@@ -562,13 +553,11 @@ static int usb3hdcap_enum_dv_timings(struct file *file, void *priv,
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	if (timings->index >= ARRAY_SIZE(all_supported_dv_timings))
-		return -EINVAL;
-	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
-		return -ENODATA;
-
-	timings->timings = all_supported_dv_timings[timings->index];
-	return 0;
+	if (hdcap->input == INPUT_COMPONENT)
+		return usb3hdcap_component_enum_dv_timings(timings);
+	if (hdcap->input == INPUT_HDMI)
+		return usb3hdcap_hdmi_enum_dv_timings(timings);
+	return -ENODATA;
 }
 
 static int usb3hdcap_dv_timings_cap(struct file *file, void *priv,
@@ -577,10 +566,12 @@ static int usb3hdcap_dv_timings_cap(struct file *file, void *priv,
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
 	/* if you're not on HDMI/component, DV timings are not supported */
-	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
+	if (hdcap->input == INPUT_COMPONENT)
+		*cap = usb3hdcap_component_timings_cap;
+	else if (hdcap->input == INPUT_HDMI)
+		*cap = usb3hdcap_hdmi_timings_cap;
+	else
 		return -ENODATA;
-
-	*cap = usb3hdcap_timings_cap;
 	return 0;
 }
 

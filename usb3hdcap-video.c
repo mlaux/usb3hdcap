@@ -73,11 +73,12 @@ static void deliver_frame(struct usb3hdcap *hdcap)
 			      hdcap->bpl * hdcap->height);
 	buf->vb.vb2_buf.timestamp = ktime_get_ns();
 	if (hdcap->interlaced) {
-		buf->vb.field = hdcap->is_second_field ? V4L2_FIELD_BOTTOM : V4L2_FIELD_TOP;
+		bool bottom = hdcap->field_f;
+
+		buf->vb.field = bottom ? V4L2_FIELD_BOTTOM : V4L2_FIELD_TOP;
 		buf->vb.sequence = hdcap->sequence;
-		if (hdcap->is_second_field)
+		if (bottom)
 			hdcap->sequence++;
-		hdcap->is_second_field ^= 1;
 	} else {
 		buf->vb.field = V4L2_FIELD_NONE;
 		buf->vb.sequence = hdcap->sequence++;
@@ -120,6 +121,9 @@ static void process_video_line(struct usb3hdcap *hdcap, const u8 *video)
 			return;
 	}
 
+	if (hdcap->frame_line == 0)
+		hdcap->field_f = !!(sav_xy & BT656_F_BIT);
+
 	vyuy_to_yuyv(vb2_plane_vaddr(&hdcap->cur_buf->vb.vb2_buf, 0)
 			+ hdcap->frame_line * hdcap->bpl,
 		     video, hdcap->bpl);
@@ -142,10 +146,7 @@ static void process_data(struct usb3hdcap *hdcap)
 			/* SAV: video line */
 			if (pos + line_size > hdcap->parse_len)
 				break;
-			/*
-			 * -1 because on this hardware, XY byte occupies the first pixel's
-			 * V position
-			 */
+			/* -1 because XY byte occupies the first pixel's V position */
 			process_video_line(hdcap, buf + pos + SAV_LEN - 1);
 			pos += line_size;
 		} else if (buf[pos + 2] == 0xff) {
@@ -385,7 +386,7 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 	hdcap->frame_line = 0;
 	hdcap->synced = 0;
 	hdcap->was_blanking = 0;
-	hdcap->is_second_field = 0;
+	hdcap->field_f = 0;
 	hdcap->cur_buf = NULL;
 
 	if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)
