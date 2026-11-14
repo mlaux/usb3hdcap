@@ -181,8 +181,7 @@ int u3hc_i2c_write(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 val)
 {
 	if (hdcap->has_mcu) {
 		if (addr == ADDR_MST3367 && reg != 0x00)
-			mcu_i2c_write(hdcap, ADDR_MST3367, 0x00,
-				       hdcap->mst_current_bank);
+			mcu_i2c_write(hdcap, ADDR_MST3367, 0x00, hdcap->mst_current_bank);
 		return mcu_i2c_write(hdcap, addr, reg, val);
 	}
 	return vendor_out(hdcap, REQ_I2C, addr, reg, &val, 1);

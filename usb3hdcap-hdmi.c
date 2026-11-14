@@ -13,7 +13,6 @@
 
 #include "usb3hdcap.h"
 
-
 const struct v4l2_dv_timings_cap usb3hdcap_hdmi_timings_cap = {
 	.type = V4L2_DV_BT_656_1120,
 	.bt = {
@@ -487,12 +486,12 @@ static const struct v4l2_dv_timings *match_hdmi_timing(int hactive, int vtotal,
 					   NULL, NULL))
 			continue;
 
-		vtotal_err = abs(vtotal * fields - (int) frame_height);
+		vtotal_err = abs(vtotal * fields - (int)frame_height);
 		if (vtotal_err > HDMI_VTOTAL_TOLERANCE)
 			continue;
 
 		vfreq_err = abs(vfreq -
-				(int) DIV_ROUND_CLOSEST_ULL(bt->pixelclock * 10 * fields,
+				(int)DIV_ROUND_CLOSEST_ULL(bt->pixelclock * 10 * fields,
 							   frame_width * frame_height));
 		if (vfreq_err > HDMI_VFREQ_TOLERANCE)
 			continue;
@@ -657,7 +656,7 @@ static const struct component_mode *match_component_mode(int vtotal, int hfreq,
 		const struct v4l2_bt_timings *bt = &m->timings.bt;
 		int std_vtotal = V4L2_DV_BT_FRAME_HEIGHT(bt) /
 				 (bt->interlaced ? 2 : 1);
-		int std_hfreq = (u32) bt->pixelclock /
+		int std_hfreq = (u32)bt->pixelclock /
 				(V4L2_DV_BT_FRAME_WIDTH(bt) * 100);
 		int vtotal_err = abs(vtotal - std_vtotal);
 		int hfreq_err = abs(hfreq - std_hfreq);
