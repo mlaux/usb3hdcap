@@ -329,6 +329,10 @@ static void usb3hdcap_stop(struct usb3hdcap *hdcap,
 
 	usb3hdcap_free_urbs(hdcap);
 
+	if (hdcap->usb_dev &&
+	    (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO))
+		v4l2_subdev_call(hdcap->sd_tw9900, video, s_stream, 0);
+
 	/* Return any in-progress buffer */
 	if (hdcap->cur_buf) {
 		vb2_buffer_done(&hdcap->cur_buf->vb.vb2_buf, buf_state);
@@ -389,8 +393,11 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 	hdcap->field_f = 0;
 	hdcap->cur_buf = NULL;
 
-	if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO)
-		v4l2_ctrl_handler_setup(&hdcap->ctrl);
+	if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO) {
+		ret = v4l2_subdev_call(hdcap->sd_tw9900, video, s_stream, 1);
+		if (ret < 0)
+			goto fail;
+	}
 
 	/*
 	 * Select alt setting based on bandwidth:

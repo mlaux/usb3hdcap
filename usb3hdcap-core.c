@@ -30,6 +30,7 @@
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
+#include <linux/i2c.h>
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/kref.h>
@@ -37,6 +38,7 @@
 #include <linux/usb.h>
 #include <linux/vmalloc.h>
 #include <linux/mutex.h>
+#include <media/i2c/mst3367.h>
 #include <media/v4l2-common.h>
 #include <media/v4l2-dv-timings.h>
 #include <media/v4l2-event.h>
@@ -179,6 +181,9 @@ out:
 
 int u3hc_i2c_write(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 val)
 {
+	if (addr == ADDR_MST3367 && reg == 0x00)
+		hdcap->mst_current_bank = val;
+
 	if (hdcap->has_mcu) {
 		if (addr == ADDR_MST3367 && reg != 0x00)
 			mcu_i2c_write(hdcap, ADDR_MST3367, 0x00, hdcap->mst_current_bank);
@@ -214,14 +219,54 @@ int u3hc_i2c_rmw(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits)
 	return u3hc_i2c_write(hdcap, addr, reg, (val & mask) | bits);
 }
 
-int u3hc_i2c_rmw_get_old(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits, u8 *old)
-{
-	int val = u3hc_i2c_read(hdcap, addr, reg);
+/* ------------------------------------------------------------------ */
+/* I2C adapter for the TW9900 and MST3367 sub-devices                 */
+/* ------------------------------------------------------------------ */
 
-	if (val < 0)
-		return val;
-	*old = val;
-	return u3hc_i2c_write(hdcap, addr, reg, (val & mask) | bits);
+static int usb3hdcap_smbus_xfer(struct i2c_adapter *adap, u16 addr,
+				unsigned short flags, char read_write,
+				u8 command, int size,
+				union i2c_smbus_data *data)
+{
+	struct usb3hdcap *hdcap = i2c_get_adapdata(adap);
+	int ret;
+
+	if (!hdcap->usb_dev)
+		return -ENODEV;
+
+	if (size != I2C_SMBUS_BYTE_DATA)
+		return -EOPNOTSUPP;
+
+	if (read_write == I2C_SMBUS_WRITE)
+		return u3hc_i2c_write(hdcap, addr << 1, command, data->byte);
+
+	ret = u3hc_i2c_read(hdcap, addr << 1, command);
+	if (ret < 0)
+		return ret;
+
+	data->byte = ret;
+	return 0;
+}
+
+static u32 usb3hdcap_i2c_functionality(struct i2c_adapter *adap)
+{
+	return I2C_FUNC_SMBUS_BYTE_DATA;
+}
+
+static const struct i2c_algorithm usb3hdcap_i2c_algo = {
+	.smbus_xfer = usb3hdcap_smbus_xfer,
+	.functionality = usb3hdcap_i2c_functionality,
+};
+
+static int usb3hdcap_i2c_register(struct usb3hdcap *hdcap)
+{
+	hdcap->i2c_adap.owner = THIS_MODULE;
+	hdcap->i2c_adap.algo = &usb3hdcap_i2c_algo;
+	hdcap->i2c_adap.dev.parent = hdcap->dev;
+	strscpy(hdcap->i2c_adap.name, "usb3hdcap", sizeof(hdcap->i2c_adap.name));
+	i2c_set_adapdata(&hdcap->i2c_adap, hdcap);
+
+	return i2c_add_adapter(&hdcap->i2c_adap);
 }
 
 /* CheckIsMCUExist() */
@@ -340,7 +385,6 @@ int usb3hdcap_hw_init(struct usb3hdcap *hdcap)
 	hdcap->detected_timings_present = 0;
 	hdcap->requested_timings_present = 0;
 
-	usb3hdcap_device_init(hdcap);
 	usb3hdcap_cs53l21_init(hdcap);
 
 	switch (hdcap->input) {
@@ -488,16 +532,34 @@ static int usb3hdcap_s_std(struct file *file, void *priv, v4l2_std_id norm)
 /* DV timings (HDMI + HD component)                                   */
 /* ------------------------------------------------------------------ */
 
+static unsigned int usb3hdcap_mst3367_pad(struct usb3hdcap *hdcap)
+{
+	return hdcap->input == INPUT_HDMI ?
+		MST3367_PAD_HDMI : MST3367_PAD_COMPONENT;
+}
+
+static bool usb3hdcap_component_timings_supported(const struct v4l2_dv_timings *t,
+						  void *handle)
+{
+	struct usb3hdcap *hdcap = handle;
+	struct v4l2_enum_dv_timings e = { .pad = MST3367_PAD_COMPONENT };
+
+	while (!v4l2_subdev_call(hdcap->sd_mst3367, pad, enum_dv_timings, &e)) {
+		if (v4l2_match_dv_timings(t, &e.timings, 0, false))
+			return true;
+		e.index++;
+	}
+	return false;
+}
+
 static int usb3hdcap_g_dv_timings(struct file *file, void *priv,
 				  struct v4l2_dv_timings *timings)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
 
-	/* composite/S-Video -> no DV timings */
 	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
 		return -ENODATA;
 
-	/* nothing set with s_dv_timings and nothing detected? */
 	if (!(hdcap->requested_timings_present || hdcap->detected_timings_present))
 		return -ENODATA;
 
@@ -512,19 +574,24 @@ static int usb3hdcap_s_dv_timings(struct file *file, void *priv,
 				  struct v4l2_dv_timings *timings)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
+	struct v4l2_dv_timings_cap cap = {};
 	bool valid;
+	int ret;
+
+	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
+		return -ENODATA;
+
+	cap.pad = usb3hdcap_mst3367_pad(hdcap);
+	ret = v4l2_subdev_call(hdcap->sd_mst3367, pad, dv_timings_cap, &cap);
+	if (ret < 0)
+		return ret;
 
 	if (hdcap->input == INPUT_COMPONENT)
-		valid = v4l2_valid_dv_timings(timings,
-					      &usb3hdcap_component_timings_cap,
+		valid = v4l2_valid_dv_timings(timings, &cap,
 					      usb3hdcap_component_timings_supported,
-					      NULL);
-	else if (hdcap->input == INPUT_HDMI)
-		valid = v4l2_valid_dv_timings(timings,
-					      &usb3hdcap_hdmi_timings_cap,
-					      NULL, NULL);
+					      hdcap);
 	else
-		return -ENODATA;
+		valid = v4l2_valid_dv_timings(timings, &cap, NULL, NULL);
 
 	if (!valid)
 		return -ERANGE;
@@ -551,27 +618,31 @@ static int usb3hdcap_enum_dv_timings(struct file *file, void *priv,
 				     struct v4l2_enum_dv_timings *timings)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
+	int ret;
 
-	if (hdcap->input == INPUT_COMPONENT)
-		return usb3hdcap_component_enum_dv_timings(timings);
-	if (hdcap->input == INPUT_HDMI)
-		return usb3hdcap_hdmi_enum_dv_timings(timings);
-	return -ENODATA;
+	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
+		return -ENODATA;
+
+	timings->pad = usb3hdcap_mst3367_pad(hdcap);
+	ret = v4l2_subdev_call(hdcap->sd_mst3367, pad, enum_dv_timings, timings);
+	timings->pad = 0;
+	return ret;
 }
 
 static int usb3hdcap_dv_timings_cap(struct file *file, void *priv,
 				    struct v4l2_dv_timings_cap *cap)
 {
 	struct usb3hdcap *hdcap = video_drvdata(file);
+	int ret;
 
 	/* if you're not on HDMI/component, DV timings are not supported */
-	if (hdcap->input == INPUT_COMPONENT)
-		*cap = usb3hdcap_component_timings_cap;
-	else if (hdcap->input == INPUT_HDMI)
-		*cap = usb3hdcap_hdmi_timings_cap;
-	else
+	if (!(hdcap->input == INPUT_COMPONENT || hdcap->input == INPUT_HDMI))
 		return -ENODATA;
-	return 0;
+
+	cap->pad = usb3hdcap_mst3367_pad(hdcap);
+	ret = v4l2_subdev_call(hdcap->sd_mst3367, pad, dv_timings_cap, cap);
+	cap->pad = 0;
+	return ret;
 }
 
 static int usb3hdcap_query_dv_timings(struct file *file, void *priv,
@@ -669,11 +740,9 @@ static void fill_timeperframe(struct usb3hdcap *hdcap, struct v4l2_fract *tf)
 		tf->denominator = (u32)bt->pixelclock;
 		v4l2_simplify_fraction(&tf->numerator, &tf->denominator, 8, 333);
 	} else if (hdcap->std & V4L2_STD_625_50) {
-		/* PAL: 25fps */
 		tf->numerator = 1;
 		tf->denominator = 25;
 	} else {
-		/* NTSC: 29.97fps */
 		tf->numerator = 1001;
 		tf->denominator = 30000;
 	}
@@ -741,28 +810,6 @@ static int usb3hdcap_log_status(struct file *file, void *priv)
 	return 0;
 }
 
-static int usb3hdcap_s_ctrl(struct v4l2_ctrl *ctrl)
-{
-	struct usb3hdcap *hdcap = container_of(ctrl->handler,
-		struct usb3hdcap, ctrl);
-
-	switch (ctrl->id) {
-	case V4L2_CID_BRIGHTNESS:
-		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_BRIGHT, (u8)ctrl->val);
-	case V4L2_CID_CONTRAST:
-		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_CONTRAST, ctrl->val);
-	case V4L2_CID_SATURATION:
-		u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_SAT_U, ctrl->val);
-		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_SAT_V, ctrl->val);
-	case V4L2_CID_HUE:
-		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_HUE, (u8)ctrl->val);
-	case V4L2_CID_SHARPNESS:
-		return u3hc_i2c_write(hdcap, ADDR_TW9900, TW9900_SHARPNESS, ctrl->val);
-	default:
-		return -EINVAL;
-	}
-}
-
 static int usb3hdcap_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 {
 	switch (ctrl->id) {
@@ -775,7 +822,6 @@ static int usb3hdcap_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 }
 
 static const struct v4l2_ctrl_ops usb3hdcap_ctrl_ops = {
-	.s_ctrl = usb3hdcap_s_ctrl,
 	.g_volatile_ctrl = usb3hdcap_g_volatile_ctrl,
 };
 
@@ -835,13 +881,29 @@ static const struct v4l2_file_operations usb3hdcap_fops = {
 	.poll = vb2_fop_poll,
 };
 
+static void usb3hdcap_notify(struct v4l2_subdev *sd, unsigned int notification,
+			     void *arg)
+{
+	struct usb3hdcap *hdcap = container_of(sd->v4l2_dev,
+		struct usb3hdcap, v4l2_dev);
+
+	switch (notification) {
+	case MST3367_HOTPLUG:
+		usb3hdcap_hdmi_hotplug(hdcap, *(bool *)arg);
+		break;
+	default:
+		break;
+	}
+}
+
 static void usb3hdcap_release(struct v4l2_device *v4l2_dev)
 {
 	struct usb3hdcap *hdcap = container_of(v4l2_dev,
 		struct usb3hdcap, v4l2_dev);
 
-	v4l2_device_unregister(&hdcap->v4l2_dev);
 	v4l2_ctrl_handler_free(&hdcap->ctrl);
+	v4l2_device_unregister(&hdcap->v4l2_dev);
+	i2c_del_adapter(&hdcap->i2c_adap);
 	kfree(hdcap);
 }
 
@@ -870,27 +932,7 @@ static int video_init(struct usb3hdcap *hdcap)
 		return ret;
 	}
 
-	v4l2_ctrl_handler_init(&hdcap->ctrl, 7);
-	hdcap->ctrl_brightness = v4l2_ctrl_new_std(&hdcap->ctrl,
-						   &usb3hdcap_ctrl_ops,
-						   V4L2_CID_BRIGHTNESS,
-						   -128, 127, 1, -9);
-	hdcap->ctrl_contrast = v4l2_ctrl_new_std(&hdcap->ctrl,
-						 &usb3hdcap_ctrl_ops,
-						 V4L2_CID_CONTRAST,
-						 0, 255, 1, 0x79);
-	hdcap->ctrl_saturation = v4l2_ctrl_new_std(&hdcap->ctrl,
-						   &usb3hdcap_ctrl_ops,
-						   V4L2_CID_SATURATION,
-						   0, 255, 1, 0x80);
-	hdcap->ctrl_hue = v4l2_ctrl_new_std(&hdcap->ctrl,
-					    &usb3hdcap_ctrl_ops,
-					    V4L2_CID_HUE,
-					    -128, 127, 1, 0);
-	hdcap->ctrl_sharpness = v4l2_ctrl_new_std(&hdcap->ctrl,
-						  &usb3hdcap_ctrl_ops,
-						  V4L2_CID_SHARPNESS,
-						  0, 255, 1, 0x52);
+	v4l2_ctrl_handler_init(&hdcap->ctrl, 1);
 	hdcap->ctrl_rx_power = v4l2_ctrl_new_std(&hdcap->ctrl,
 						 &usb3hdcap_ctrl_ops,
 						 V4L2_CID_DV_RX_POWER_PRESENT,
@@ -906,11 +948,28 @@ static int video_init(struct usb3hdcap *hdcap)
 
 	hdcap->v4l2_dev.ctrl_handler = &hdcap->ctrl;
 	hdcap->v4l2_dev.release = usb3hdcap_release;
+	hdcap->v4l2_dev.notify = usb3hdcap_notify;
 	ret = v4l2_device_register(hdcap->dev, &hdcap->v4l2_dev);
 	if (ret < 0) {
 		dev_warn(hdcap->dev, "Could not register v4l2 device\n");
 		goto v4l2_fail;
 	}
+
+	usb3hdcap_device_init(hdcap);
+
+	ret = usb3hdcap_i2c_register(hdcap);
+	if (ret < 0) {
+		dev_warn(hdcap->dev, "Could not register I2C adapter\n");
+		goto vdev_fail;
+	}
+
+	ret = usb3hdcap_composite_register(hdcap);
+	if (ret < 0)
+		goto subdev_fail;
+
+	ret = usb3hdcap_hdmi_register(hdcap);
+	if (ret < 0)
+		goto subdev_fail;
 
 	strscpy(hdcap->video_dev.name, "usb3hdcap", sizeof(hdcap->video_dev.name));
 	hdcap->video_dev.v4l2_dev = &hdcap->v4l2_dev;
@@ -926,13 +985,17 @@ static int video_init(struct usb3hdcap *hdcap)
 	ret = video_register_device(&hdcap->video_dev, VFL_TYPE_VIDEO, -1);
 	if (ret < 0) {
 		dev_warn(hdcap->dev, "Could not register video device\n");
-		goto vdev_fail;
+		goto subdev_fail;
 	}
 
 	dev_info(hdcap->dev, "%s: registered as %s\n",
 		 __func__, video_device_node_name(&hdcap->video_dev));
 
 	return 0;
+
+subdev_fail:
+	v4l2_ctrl_handler_free(&hdcap->ctrl);
+	i2c_del_adapter(&hdcap->i2c_adap);
 
 vdev_fail:
 	v4l2_device_unregister(&hdcap->v4l2_dev);
@@ -1009,8 +1072,11 @@ static void usb3hdcap_disconnect(struct usb_interface *intf)
 	usb3hdcap_audio_free(hdcap);
 	v4l2_device_disconnect(&hdcap->v4l2_dev);
 
+	/* the sub-devices stay around until release and may still do I2C */
+	i2c_lock_bus(&hdcap->i2c_adap, I2C_LOCK_ROOT_ADAPTER);
 	usb_put_dev(hdcap->usb_dev);
 	hdcap->usb_dev = NULL;
+	i2c_unlock_bus(&hdcap->i2c_adap, I2C_LOCK_ROOT_ADAPTER);
 
 	/* hdcap is freed by usb3hdcap_release when last user closes fd */
 	v4l2_device_put(&hdcap->v4l2_dev);

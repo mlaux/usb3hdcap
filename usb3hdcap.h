@@ -2,6 +2,7 @@
 #ifndef USB3HDCAP_H
 #define USB3HDCAP_H
 
+#include <linux/i2c.h>
 #include <linux/usb.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ctrls.h>
@@ -73,18 +74,6 @@ enum usb3hdcap_input {
 #define TW9900_OVSDLY     0x6d
 #define TW9900_OVSEND     0x6e
 
-/* TW9900 bit definitions */
-#define TW9900_NINTL         0x08
-#define TW9900_STDNOW_SHIFT  4
-#define TW9900_STDNOW_MASK   0x70
-#define TW9900_STD_NTSC_M    0
-#define TW9900_STD_PAL_BDGHI 1
-#define TW9900_STD_SECAM     2
-#define TW9900_STD_NTSC_4_43 3
-#define TW9900_STD_PAL_M     4
-#define TW9900_STD_PAL_CN    5
-#define TW9900_STD_PAL_60    6
-
 /* CS53L21 registers */
 #define CS53L21_MIC_PWR_CTL  0x03
 #define CS53L21_IFACE_CTL    0x04
@@ -143,6 +132,10 @@ struct usb3hdcap {
 	struct v4l2_device v4l2_dev;
 	struct video_device video_dev;
 	struct vb2_queue vb2q;
+
+	struct i2c_adapter i2c_adap;
+	struct v4l2_subdev *sd_tw9900;
+	struct v4l2_subdev *sd_mst3367;
 
 	struct v4l2_ctrl_handler ctrl;
 	struct v4l2_ctrl *ctrl_brightness;
@@ -221,22 +214,17 @@ int vendor_out(struct usb3hdcap *hdcap, u8 request, u16 value, u16 index,
 int u3hc_i2c_write(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 val);
 int u3hc_i2c_read(struct usb3hdcap *hdcap, u8 addr, u8 reg);
 int u3hc_i2c_rmw(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits);
-int u3hc_i2c_rmw_get_old(struct usb3hdcap *hdcap, u8 addr, u8 reg, u8 mask, u8 bits, u8 *old);
 int usb3hdcap_hw_init(struct usb3hdcap *hdcap);
 
 /* Composite (usb3hdcap-composite.c) */
+int usb3hdcap_composite_register(struct usb3hdcap *hdcap);
 int usb3hdcap_composite_init(struct usb3hdcap *hdcap);
 
 /* HDMI + Component (usb3hdcap-hdmi.c) */
+int usb3hdcap_hdmi_register(struct usb3hdcap *hdcap);
 int usb3hdcap_hdmi_init(struct usb3hdcap *hdcap);
 int usb3hdcap_component_init(struct usb3hdcap *hdcap);
-extern const struct v4l2_dv_timings_cap usb3hdcap_hdmi_timings_cap;
-extern const struct v4l2_dv_timings_cap usb3hdcap_component_timings_cap;
-int usb3hdcap_hdmi_enum_dv_timings(struct v4l2_enum_dv_timings *timings);
-int usb3hdcap_component_enum_dv_timings(struct v4l2_enum_dv_timings *timings);
-bool usb3hdcap_component_timings_supported(const struct v4l2_dv_timings *t,
-					   void *handle);
-void mst3367_write_csc(struct usb3hdcap *hdcap);
+void usb3hdcap_hdmi_hotplug(struct usb3hdcap *hdcap, bool hotplug);
 
 /* Video/streaming (usb3hdcap-video.c) */
 extern const struct vb2_ops usb3hdcap_vb2_ops;
