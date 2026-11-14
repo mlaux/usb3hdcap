@@ -23,7 +23,7 @@
  *
  * Based on USBPcap analysis and reverse engineering of CY3014.X64.SYS
  *   (version 1.1.0.193 of Fri, 04 Jun 2021 09:37:45 UTC)
- * MST3367 HDMI path based on hdcapm
+ * MST3367 HDMI path based on hdcapm by Steven Toth
  * Driver structure based heavily on usbtv
  */
 

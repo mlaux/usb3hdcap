@@ -157,11 +157,6 @@ static int mst_bank(struct usb3hdcap *hdcap, int bank)
 
 static void mst3367_config(struct usb3hdcap *hdcap)
 {
-	/*
-	 * Largely based on mst3367-drv.c by Steven Toth and Ghidra decompilation
-	 * of the Windows x64 driver
-	 */
-
 	mst_bank(hdcap, 0x00);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x51, 0x80);
 	u3hc_i2c_write(hdcap, ADDR_MST3367, 0x13, 0x08);
