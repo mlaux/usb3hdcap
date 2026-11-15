@@ -521,8 +521,12 @@ static int usb3hdcap_s_std(struct file *file, void *priv, v4l2_std_id norm)
 	if (!(norm & USB3HDCAP_V4L2_STDS))
 		return -EINVAL;
 
-	if (vb2_is_busy(&hdcap->vb2q))
-		return -EBUSY;
+	if (vb2_is_busy(&hdcap->vb2q)) {
+		v4l2_std_id cur;
+
+		usb3hdcap_g_std(file, priv, &cur);
+		return norm == cur ? 0 : -EBUSY;
+	}
 
 	hdcap->requested_std = norm;
 	return 0;

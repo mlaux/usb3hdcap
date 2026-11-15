@@ -75,8 +75,11 @@ static void deliver_frame(struct usb3hdcap *hdcap)
 	if (hdcap->interlaced) {
 		bool bottom = hdcap->field_f;
 
+		if (!bottom && hdcap->top_done)
+			hdcap->sequence++;
 		buf->vb.field = bottom ? V4L2_FIELD_BOTTOM : V4L2_FIELD_TOP;
 		buf->vb.sequence = hdcap->sequence;
+		hdcap->top_done = !bottom;
 		if (bottom)
 			hdcap->sequence++;
 	} else {
@@ -121,8 +124,12 @@ static void process_video_line(struct usb3hdcap *hdcap, const u8 *video)
 			return;
 	}
 
-	if (hdcap->frame_line == 0)
+	if (hdcap->frame_line == 0) {
 		hdcap->field_f = !!(sav_xy & BT656_F_BIT);
+		/* skip bottom field where the top was dropped */
+		if (hdcap->interlaced && hdcap->field_f && !hdcap->top_done)
+			return;
+	}
 
 	vyuy_to_yuyv(vb2_plane_vaddr(&hdcap->cur_buf->vb.vb2_buf, 0)
 			+ hdcap->frame_line * hdcap->bpl,
@@ -391,6 +398,7 @@ static int usb3hdcap_start(struct usb3hdcap *hdcap)
 	hdcap->synced = 0;
 	hdcap->was_blanking = 0;
 	hdcap->field_f = 0;
+	hdcap->top_done = 0;
 	hdcap->cur_buf = NULL;
 
 	if (hdcap->input == INPUT_COMPOSITE || hdcap->input == INPUT_SVIDEO) {

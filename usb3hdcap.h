@@ -181,6 +181,7 @@ struct usb3hdcap {
 	int was_blanking;
 	/* BT.656 F bit of the field being captured */
 	u8 field_f;
+	u8 top_done;
 
 	/* hardware init state */
 	int hw_inited;
