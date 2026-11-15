@@ -713,33 +713,6 @@ static const struct v4l2_ctrl_ops tw9900_ctrl_ops = {
 	.s_ctrl	= tw9900_s_ctrl,
 };
 
-static int tw9900_check_id(struct tw9900 *tw9900,
-			   struct i2c_client *client)
-{
-	struct device *dev = &tw9900->client->dev;
-	int ret;
-
-	ret = pm_runtime_resume_and_get(&tw9900->client->dev);
-	if (ret < 0)
-		return ret;
-
-	mutex_lock(&tw9900->mutex);
-	ret = tw9900_read_reg(client, TW9900_CHIP_ID);
-	mutex_unlock(&tw9900->mutex);
-
-	pm_runtime_put_autosuspend(&tw9900->client->dev);
-
-	if (ret < 0)
-		return ret;
-
-	if (ret != TW9900_CHIP_ID) {
-		dev_err(dev, "Unexpected decoder id %#x\n", ret);
-		return -ENODEV;
-	}
-
-	return 0;
-}
-
 static int tw9900_runtime_resume(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -886,10 +859,6 @@ static int tw9900_probe(struct i2c_client *client)
 	pm_runtime_set_autosuspend_delay(dev, TW9900_AUTOSUSPEND_DELAY_MS);
 	pm_runtime_use_autosuspend(dev);
 	pm_runtime_enable(dev);
-
-	ret = tw9900_check_id(tw9900, client);
-	if (ret)
-		goto err_disable_pm;
 
 	ret = v4l2_async_register_subdev(&tw9900->subdev);
 	if (ret) {
